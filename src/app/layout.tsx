@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "IEEE Grand Prix — Pit Wall Telemetry & Live Racing Quiz",
+  title: "IEEE Grand Prix",
   description:
-    "Ship answers at race pace. Real-time web engineering grand prix powered by an authoritative server clock.",
+    "A live multiplayer coding quiz where every correct answer moves your car forward on the big screen.",
 };
 
 export default function RootLayout({
@@ -24,9 +24,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" className="dark">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} font-sans min-h-screen bg-background text-foreground antialiased selection:bg-accent selection:text-accent-fg`}
+        className={`${geistSans.variable} ${geistMono.variable} font-sans min-h-screen bg-background text-foreground antialiased selection:bg-brand selection:text-foreground`}
       >
         {children}
       </body>

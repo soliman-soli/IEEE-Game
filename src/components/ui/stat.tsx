@@ -5,7 +5,7 @@ export interface StatProps extends React.HTMLAttributes<HTMLDivElement> {
   label: string;
   value: React.ReactNode;
   sub?: React.ReactNode;
-  tone?: "default" | "accent" | "ok" | "danger";
+  tone?: "default" | "brand" | "signal" | "success" | "danger";
 }
 
 export function Stat({
@@ -19,28 +19,29 @@ export function Stat({
   return (
     <div
       className={cn(
-        "flex flex-col justify-between gap-1 rounded-[var(--radius-sm)] border border-border bg-surface px-3.5 py-2.5",
+        "flex flex-col justify-between gap-1 rounded-[var(--radius-default)] border border-border bg-surface px-4 py-3",
         className,
       )}
       {...props}
     >
-      <span className="font-mono text-[11px] lowercase tracking-[0.04em] text-muted">
+      <span className="font-mono text-[11px] leading-4 lowercase tracking-[0.04em] text-secondary">
         {label}
       </span>
       <div className="flex items-baseline justify-between gap-2">
         <span
           className={cn(
-            "font-mono text-lg font-semibold tracking-tight tabular-nums",
+            "font-mono text-xl font-medium tracking-tight tabular-nums",
             tone === "default" && "text-foreground",
-            tone === "accent" && "text-accent",
-            tone === "ok" && "text-ok",
+            tone === "brand" && "text-brand-light",
+            tone === "signal" && "text-signal",
+            tone === "success" && "text-success",
             tone === "danger" && "text-danger",
           )}
         >
           {value}
         </span>
         {sub && (
-          <span className="font-mono text-[11px] text-dim tabular-nums">
+          <span className="font-mono text-[11px] text-muted tabular-nums">
             {sub}
           </span>
         )}

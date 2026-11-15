@@ -6,7 +6,7 @@ import { Button } from "./button";
 
 export function CopyButton({
   value,
-  label = "Copy join link",
+  label = "Copy link",
   className,
 }: {
   value: string;
@@ -33,12 +33,12 @@ export function CopyButton({
     >
       {copied ? (
         <>
-          <Check className="size-3.5 text-ok" />
-          <span>copied</span>
+          <Check className="size-3.5 text-success" />
+          <span>Copied</span>
         </>
       ) : (
         <>
-          <Copy className="size-3.5 text-muted" />
+          <Copy className="size-3.5 text-secondary" />
           <span>{label}</span>
         </>
       )}

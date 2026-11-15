@@ -22,7 +22,7 @@ export function TableHead({
   return (
     <thead
       className={cn(
-        "border-b border-border bg-subtle font-mono text-[11px] lowercase tracking-[0.04em] text-muted",
+        "border-b border-border bg-elevated/40 font-mono text-[11px] lowercase tracking-[0.04em] text-secondary",
         className,
       )}
       {...props}
@@ -49,7 +49,7 @@ export function TableRow({
   return (
     <tr
       className={cn(
-        "transition-colors hover:bg-elevated/60",
+        "transition-colors duration-[var(--duration-ui)] hover:bg-elevated/60",
         className,
       )}
       {...props}
@@ -63,7 +63,7 @@ export function TableHeaderCell({
 }: React.ThHTMLAttributes<HTMLTableCellElement>) {
   return (
     <th
-      className={cn("px-3.5 py-2.5 font-normal whitespace-nowrap", className)}
+      className={cn("px-4 py-2.5 font-normal whitespace-nowrap", className)}
       {...props}
     />
   );
@@ -75,7 +75,7 @@ export function TableCell({
 }: React.TdHTMLAttributes<HTMLTableCellElement>) {
   return (
     <td
-      className={cn("px-3.5 py-2.5 align-middle", className)}
+      className={cn("px-4 py-3 align-middle", className)}
       {...props}
     />
   );

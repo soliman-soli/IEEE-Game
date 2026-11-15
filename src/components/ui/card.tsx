@@ -8,7 +8,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-[var(--radius-md)] border border-border bg-surface text-foreground transition-colors duration-150",
+        "rounded-[var(--radius-default)] border border-border bg-surface text-foreground transition-colors duration-[var(--duration-ui)] ease-[var(--ease-out)]",
         className,
       )}
       {...props}
@@ -23,7 +23,7 @@ export function CardHeader({
   return (
     <div
       className={cn(
-        "flex items-center justify-between gap-3 border-b border-border px-4 py-3",
+        "flex items-center justify-between gap-3 border-b border-border px-5 py-3.5",
         className,
       )}
       {...props}
@@ -35,7 +35,7 @@ export function CardBody({
   className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("p-4", className)} {...props} />;
+  return <div className={cn("p-5", className)} {...props} />;
 }
 
 export function CardFooter({
@@ -45,7 +45,7 @@ export function CardFooter({
   return (
     <div
       className={cn(
-        "flex items-center justify-between gap-3 border-t border-border bg-subtle/60 px-4 py-3",
+        "flex items-center justify-between gap-3 border-t border-border px-5 py-3.5",
         className,
       )}
       {...props}

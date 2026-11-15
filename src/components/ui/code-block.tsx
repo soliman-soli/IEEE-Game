@@ -11,7 +11,7 @@ export function CodeBlock({
   return (
     <div
       className={cn(
-        "w-full overflow-x-auto rounded-[var(--radius-sm)] border border-border bg-subtle px-3.5 py-3 font-mono text-[13px] leading-relaxed text-foreground",
+        "w-full overflow-x-auto rounded-[var(--radius-default)] border border-border bg-background px-3.5 py-3 font-mono text-[13px] leading-relaxed text-foreground",
         className,
       )}
     >

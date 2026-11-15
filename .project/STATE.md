@@ -1,6 +1,6 @@
 # State
 
-**Phase:** Phase 4 (Implementation), Phase 5 (55-Bot Simulation & Unit Tests), Phase 6 (Organizer Run-Sheet & Event Readiness), and Pit Wall Telemetry UI/UX Redesign (D-029) complete.
+**Phase:** Phase 4 (Implementation), Phase 5 (55-Bot Simulation & Unit Tests), Phase 6 (Organizer Run-Sheet & Event Readiness), and Linear/Vercel Dark-Only UI Redesign (D-030) complete.
 **Status:** Deployed and live on Vercel (`https://ieee-game-one.vercel.app`).
 
 ## Verified

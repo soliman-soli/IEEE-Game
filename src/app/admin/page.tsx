@@ -24,9 +24,11 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Chip } from "@/components/ui/chip";
 import { CodeBlock } from "@/components/ui/code-block";
 import { CopyButton } from "@/components/ui/copy-button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Panel } from "@/components/ui/panel";
 import { RaceCarSvg } from "@/components/ui/race-car-svg";
@@ -39,7 +41,6 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import {
   updateOffsetFromServerIso,
   useAuthoritativeCountdown,
@@ -240,14 +241,14 @@ export default function AdminPortalPage() {
       syncFormFromRace((payload as AdminPayload).race);
       setActionMsg(
         action === "start"
-          ? "Launch sequence initiated across all surfaces."
+          ? "Countdown initiated across all screens."
           : action === "end"
-            ? "Session terminated and classification locked."
+            ? "Race ended and standings locked."
             : action === "reset"
-              ? "Session reset to starting grid."
+              ? "Round reset to lobby."
               : action === "new-round"
-                ? "New round initialized with fresh question pool."
-                : "Session calibration saved.",
+                ? "New round created with a fresh question pool."
+                : "Configuration saved.",
       );
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Operation failed.");
@@ -433,66 +434,62 @@ export default function AdminPortalPage() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background px-4">
         <div className="w-full max-w-md space-y-4">
-          <div className="flex items-center justify-between">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-1.5 font-mono text-xs text-muted hover:text-foreground"
-            >
-              <ArrowLeft className="size-3.5" />
-              <span>surfaces</span>
-            </Link>
-            <ThemeToggle />
-          </div>
-
-          <Panel
-            index="03"
-            label="security / race control auth"
-            rightSlot={<Lock className="size-3.5 text-accent" />}
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 font-mono text-xs text-secondary hover:text-foreground"
           >
-            <div className="p-6 space-y-5">
-              <div>
-                <h1 className="font-sans text-2xl font-semibold tracking-[-0.025em] text-foreground">
-                  Race Director Console
+            <ArrowLeft className="size-3.5" />
+            <span>Back to home</span>
+          </Link>
+
+          <Card>
+            <CardHeader>
+              <Label index="surface">03 · admin</Label>
+              <Lock className="size-3.5 text-secondary" />
+            </CardHeader>
+            <CardBody className="space-y-5">
+              <div className="space-y-1">
+                <h1 className="font-sans text-xl font-medium tracking-[-0.02em] text-foreground">
+                  Race Control Login
                 </h1>
-                <p className="mt-1 text-xs text-muted">
-                  Authenticate to manage session duration, driver grid, and the
-                  90-question bank.
+                <p className="text-xs text-secondary">
+                  Sign in to configure rounds, moderate players, and manage the
+                  question bank.
                 </p>
               </div>
 
               {loginError && (
-                <div className="rounded-[var(--radius-sm)] border border-danger bg-danger-subtle p-3 font-mono text-xs text-danger">
+                <div className="rounded-[var(--radius-default)] border border-danger/40 bg-danger-subtle p-3 font-mono text-xs text-danger">
                   {loginError}
                 </div>
               )}
 
               <form onSubmit={handleLogin} className="space-y-4">
-                <div>
+                <div className="space-y-1.5">
                   <label
                     htmlFor="admin-password"
-                    className="mb-1.5 block font-mono text-[11px] lowercase tracking-[0.04em] text-muted"
+                    className="block font-mono text-[11px] lowercase tracking-[0.04em] text-secondary"
                   >
-                    director key (ADMIN_PASSWORD)
+                    admin password
                   </label>
-                  <input
+                  <Input
                     id="admin-password"
                     type="password"
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter director password..."
-                    className="h-10 w-full rounded-[var(--radius-sm)] border border-border bg-subtle px-3 font-mono text-xs text-foreground focus:border-accent focus:outline-none"
+                    placeholder="Enter ADMIN_PASSWORD..."
                   />
-                  <p className="mt-1.5 font-mono text-[11px] text-dim">
-                    default key: <code>ieee-race-2026</code>
+                  <p className="font-mono text-[11px] text-muted">
+                    Default password: <code>ieee-race-2026</code>
                   </p>
                 </div>
                 <Button type="submit" size="lg" disabled={busy} className="w-full">
-                  {busy ? "Verifying key..." : "Unlock race control"}
+                  {busy ? "Signing in..." : "Sign in"}
                 </Button>
               </form>
-            </div>
-          </Panel>
+            </CardBody>
+          </Card>
         </div>
       </main>
     );
@@ -500,9 +497,10 @@ export default function AdminPortalPage() {
 
   if (!data) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background font-mono text-xs text-muted">
-        <span className="mr-2 size-2 rounded-full bg-accent animate-pulse" />
-        <span>telemetry / loading race control console...</span>
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Label index="admin" tone="signal" dot>
+          loading race control
+        </Label>
       </div>
     );
   }
@@ -533,38 +531,35 @@ export default function AdminPortalPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
-      {/* Sticky Top Console Bar */}
-      <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-md px-4 py-2.5 md:px-6">
+      {/* Sticky Top Header */}
+      <header className="sticky top-0 z-40 border-b border-border bg-background/95 px-4 py-3 md:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <Link
               href="/"
-              aria-label="Back to surfaces"
-              className="flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-border bg-surface text-muted transition-colors hover:text-foreground"
+              aria-label="Back to home"
+              className="flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-default)] border border-border bg-surface text-secondary transition-colors duration-[var(--duration-ui)] hover:border-border-strong hover:text-foreground"
             >
               <ArrowLeft className="size-4" />
             </Link>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-xs font-semibold text-foreground">
-                  03 / race control
+              <div className="flex items-center gap-2.5">
+                <span className="font-sans text-sm font-medium text-foreground">
+                  Race Control
                 </span>
                 <Chip
                   tone={
-                    race.status === "RACING"
-                      ? "ok"
-                      : race.status === "COUNTDOWN" ||
-                          race.status === "FINISHED"
-                        ? "accent"
-                        : "neutral"
+                    race.status === "RACING" || race.status === "COUNTDOWN"
+                      ? "signal"
+                      : "neutral"
                   }
-                  dot
+                  dot={race.status === "RACING"}
                 >
                   {race.status.toLowerCase()}
                 </Chip>
               </div>
-              <p className="truncate font-mono text-[11px] text-muted tabular-nums">
-                {race.name} · {players.length} drivers · clock{" "}
+              <p className="truncate font-mono text-[11px] text-secondary tabular-nums">
+                {race.name} · {players.length} players · clock{" "}
                 {race.status === "RACING"
                   ? formattedRaceTimer
                   : race.status === "COUNTDOWN"
@@ -575,59 +570,54 @@ export default function AdminPortalPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <ThemeToggle />
-            <CopyButton value={joinUrl} label="copy /play link" />
+            <CopyButton value={joinUrl} label="Copy join link" />
             <Link
               href="/display"
               target="_blank"
-              className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-sm)] border border-border bg-elevated px-2.5 font-mono text-xs text-foreground transition-colors hover:border-border-strong"
+              className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-default)] border border-border bg-elevated px-3 font-sans text-xs font-medium text-foreground transition-colors duration-[var(--duration-ui)] hover:border-border-strong"
             >
-              <span>broadcast</span>
-              <ExternalLink className="size-3 text-accent" />
+              <span>Open display</span>
+              <ExternalLink className="size-3.5 text-secondary" />
             </Link>
             <Button variant="ghost" size="sm" onClick={handleLogout}>
               <LogOut className="size-3.5" />
-              <span className="hidden sm:inline">lock</span>
+              <span className="hidden sm:inline">Sign out</span>
             </Button>
           </div>
         </div>
       </header>
 
-      {/* Console Shell: Left Rail + Hairline Hatch Divider + Main Workspace */}
-      <div className="flex-1 md:grid md:grid-cols-[220px_12px_minmax(0,1fr)]">
-        {/* Left Navigation Rail */}
-        <aside className="border-b border-border bg-surface p-3 md:border-b-0">
-          <div className="mb-2 hidden px-2 md:block">
-            <Label index="nav">instruments</Label>
+      {/* Main Layout: Sidebar + Content */}
+      <div className="flex-1 md:grid md:grid-cols-[220px_minmax(0,1fr)]">
+        {/* Sidebar Navigation */}
+        <aside className="border-b border-border bg-surface p-3 md:border-b-0 md:border-r">
+          <div className="mb-2 hidden px-2.5 md:block">
+            <Label index="surface">03 · sections</Label>
           </div>
           <nav className="flex gap-1 overflow-x-auto md:flex-col">
             {(
               [
                 {
                   id: "control" as AdminTab,
-                  index: "01",
-                  label: "session & config",
+                  label: "Race & Config",
                   icon: Settings,
                   badge: race.status.toLowerCase(),
                 },
                 {
                   id: "players" as AdminTab,
-                  index: "02",
-                  label: "driver grid",
+                  label: "Players",
                   icon: Users,
                   badge: String(players.length),
                 },
                 {
                   id: "questions" as AdminTab,
-                  index: "03",
-                  label: "telemetry bank",
+                  label: "Question Bank",
                   icon: FileQuestion,
                   badge: String(questions.length),
                 },
                 {
                   id: "results" as AdminTab,
-                  index: "04",
-                  label: "archive & csv",
+                  label: "Results & CSV",
                   icon: Trophy,
                   badge: String(history.length),
                 },
@@ -641,22 +631,22 @@ export default function AdminPortalPage() {
                   type="button"
                   onClick={() => setActiveTab(item.id)}
                   className={cn(
-                    "flex shrink-0 items-center justify-between gap-2 rounded-[var(--radius-sm)] border px-2.5 py-2 text-left font-mono text-xs transition-colors cursor-pointer",
+                    "flex shrink-0 items-center justify-between gap-2 rounded-[var(--radius-default)] border px-3 py-2 text-left text-xs font-medium transition-colors duration-[var(--duration-ui)] cursor-pointer",
                     active
-                      ? "border-accent/50 bg-accent-subtle text-foreground"
-                      : "border-transparent text-muted hover:bg-elevated hover:text-foreground",
+                      ? "border-brand-light/40 bg-brand-subtle text-foreground"
+                      : "border-transparent text-secondary hover:bg-elevated hover:text-foreground",
                   )}
                 >
                   <span className="flex items-center gap-2">
                     <Icon
                       className={cn(
                         "size-3.5 shrink-0",
-                        active ? "text-accent" : "text-muted",
+                        active ? "text-brand-light" : "text-secondary",
                       )}
                     />
                     <span>{item.label}</span>
                   </span>
-                  <span className="rounded-[var(--radius-xs)] border border-border bg-subtle px-1.5 py-0.5 text-[10px] text-muted tabular-nums">
+                  <span className="rounded-[6px] border border-border bg-background px-1.5 py-0.5 font-mono text-[10px] text-secondary tabular-nums">
                     {item.badge}
                   </span>
                 </button>
@@ -665,13 +655,10 @@ export default function AdminPortalPage() {
           </nav>
         </aside>
 
-        {/* Precision Hatch Divider */}
-        <div className="hatch-stripe hidden border-x border-border md:block" />
-
         {/* Main Workspace */}
-        <main className="p-4 md:p-6 space-y-5 min-w-0">
+        <main className="p-4 md:p-6 space-y-6 min-w-0">
           {actionMsg && (
-            <div className="flex items-center justify-between rounded-[var(--radius-sm)] border border-ok bg-ok-subtle px-4 py-2.5 font-mono text-xs text-ok">
+            <div className="flex items-center justify-between rounded-[var(--radius-default)] border border-success/40 bg-success-subtle px-4 py-2.5 text-xs text-success">
               <span className="flex items-center gap-2">
                 <CheckCircle2 className="size-4" />
                 <span>{actionMsg}</span>
@@ -679,7 +666,7 @@ export default function AdminPortalPage() {
               <button
                 type="button"
                 onClick={() => setActionMsg(null)}
-                className="text-[11px] underline cursor-pointer"
+                className="font-mono text-[11px] underline cursor-pointer"
               >
                 dismiss
               </button>
@@ -687,33 +674,33 @@ export default function AdminPortalPage() {
           )}
 
           {errorMsg && (
-            <div className="flex items-center justify-between rounded-[var(--radius-sm)] border border-danger bg-danger-subtle px-4 py-2.5 font-mono text-xs text-danger">
+            <div className="flex items-center justify-between rounded-[var(--radius-default)] border border-danger/40 bg-danger-subtle px-4 py-2.5 text-xs text-danger">
               <span>{errorMsg}</span>
               <button
                 type="button"
                 onClick={() => setErrorMsg(null)}
-                className="text-[11px] underline cursor-pointer"
+                className="font-mono text-[11px] underline cursor-pointer"
               >
                 dismiss
               </button>
             </div>
           )}
 
-          {/* TAB 1: SESSION LIFECYCLE & CONFIGURATION */}
+          {/* TAB 1: RACE LIFECYCLE & CONFIGURATION */}
           {activeTab === "control" && (
-            <div className="space-y-5">
-              {/* Top Telemetry KPI Strip */}
+            <div className="space-y-6">
+              {/* Top Summary Stats */}
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Stat
-                  label="session status"
+                  label="status"
                   value={race.status}
                   sub={race.name}
-                  tone={race.status === "RACING" ? "ok" : "accent"}
+                  tone={race.status === "RACING" ? "signal" : "default"}
                 />
                 <Stat
-                  label="registered cars"
+                  label="players"
                   value={players.length}
-                  sub="live grid"
+                  sub="joined"
                 />
                 <Stat
                   label="question pool"
@@ -721,35 +708,34 @@ export default function AdminPortalPage() {
                   sub={`${race.easyCount}E · ${race.mediumCount}M · ${race.hardCount}H`}
                 />
                 <Stat
-                  label="max step ceiling"
+                  label="max steps"
                   value={
                     race.easyCount * race.easyReward +
                     race.mediumCount * race.mediumReward +
                     race.hardCount * race.hardReward
                   }
-                  sub={`${race.durationSec}s window`}
-                  tone="accent"
+                  sub={`${race.durationSec}s duration`}
                 />
               </div>
 
-              {/* Primary Lifecycle Trigger Bar */}
+              {/* Primary Lifecycle Actions */}
               <Panel
-                index="01"
-                label="session / lifecycle triggers"
+                index="lifecycle"
+                label="session controls"
                 rightSlot={
                   <span className="font-mono text-[11px] text-muted">
                     server-authoritative clock
                   </span>
                 }
               >
-                <div className="flex flex-wrap items-center justify-between gap-4 p-4">
-                  <div className="space-y-0.5">
-                    <h2 className="font-sans text-base font-semibold text-foreground">
-                      Master Start & Classification Controls
+                <div className="flex flex-wrap items-center justify-between gap-4 p-5">
+                  <div className="space-y-1">
+                    <h2 className="font-sans text-base font-medium text-foreground">
+                      Start, End & Round Controls
                     </h2>
-                    <p className="text-xs text-muted">
-                      Starting locks configuration and fires a 4-second launch
-                      gantry on every driver and projector screen.
+                    <p className="text-xs text-secondary">
+                      Starting locks configuration and triggers a simultaneous
+                      4-second countdown across all screens.
                     </p>
                   </div>
 
@@ -768,23 +754,23 @@ export default function AdminPortalPage() {
 
                     {(race.status === "RACING" || race.status === "COUNTDOWN") &&
                       (confirmKey === "end" ? (
-                        <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-sm)] border border-danger bg-danger-subtle p-1.5 font-mono text-xs">
+                        <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-default)] border border-danger/40 bg-danger-subtle p-1.5 text-xs">
                           <span className="px-2 text-danger">
-                            terminate session now?
+                            End race now?
                           </span>
                           <Button
                             variant="danger"
                             size="sm"
                             onClick={() => void runRaceAction("end")}
                           >
-                            confirm end
+                            Confirm end
                           </Button>
                           <Button
                             variant="secondary"
                             size="sm"
                             onClick={() => setConfirmKey(null)}
                           >
-                            cancel
+                            Cancel
                           </Button>
                         </div>
                       ) : (
@@ -799,23 +785,23 @@ export default function AdminPortalPage() {
 
                     {!isLobby &&
                       (confirmKey === "reset" ? (
-                        <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-sm)] border border-accent bg-accent-subtle p-1.5 font-mono text-xs">
-                          <span className="px-2 text-accent">
-                            zero all scores in {race.name}?
+                        <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-default)] border border-border-strong bg-elevated p-1.5 text-xs">
+                          <span className="px-2 text-foreground">
+                            Reset all scores in this round?
                           </span>
                           <Button
                             variant="danger"
                             size="sm"
                             onClick={() => void runRaceAction("reset")}
                           >
-                            confirm reset
+                            Confirm reset
                           </Button>
                           <Button
                             variant="secondary"
                             size="sm"
                             onClick={() => setConfirmKey(null)}
                           >
-                            cancel
+                            Cancel
                           </Button>
                         </div>
                       ) : (
@@ -824,28 +810,28 @@ export default function AdminPortalPage() {
                           onClick={() => setConfirmKey("reset")}
                         >
                           <RotateCcw className="size-3.5" />
-                          <span>Reset race</span>
+                          <span>Reset round</span>
                         </Button>
                       ))}
 
                     {confirmKey === "new-round" ? (
-                      <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-sm)] border border-border-strong bg-elevated p-1.5 font-mono text-xs">
+                      <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-default)] border border-border-strong bg-elevated p-1.5 text-xs">
                         <span className="px-2 text-foreground">
-                          archive round & clear grid?
+                          Archive current round and clear lobby?
                         </span>
                         <Button
                           variant="primary"
                           size="sm"
                           onClick={() => void runRaceAction("new-round")}
                         >
-                          confirm new round
+                          Confirm new round
                         </Button>
                         <Button
                           variant="secondary"
                           size="sm"
                           onClick={() => setConfirmKey(null)}
                         >
-                          cancel
+                          Cancel
                         </Button>
                       </div>
                     ) : (
@@ -862,28 +848,28 @@ export default function AdminPortalPage() {
               </Panel>
 
               {/* Pre-Race Configuration & Join QR */}
-              <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
+              <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
                 <Panel
-                  index="02"
-                  label="calibration / pre-race parameters"
+                  index="config"
+                  label="pre-race parameters"
                   rightSlot={
                     !isLobby ? (
-                      <Chip tone="accent">
+                      <Chip tone="neutral">
                         <Lock className="size-3" />
                         <span>locked</span>
                       </Chip>
                     ) : (
-                      <Chip tone="ok">editable in lobby</Chip>
+                      <Chip tone="brand">editable</Chip>
                     )
                   }
                 >
-                  <form onSubmit={handleSaveConfig} className="p-4 space-y-5">
+                  <form onSubmit={handleSaveConfig} className="p-5 space-y-5">
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <div>
-                        <label className="mb-1.5 block font-mono text-[11px] lowercase text-muted">
-                          session identifier
+                      <div className="space-y-1.5">
+                        <label className="block font-mono text-[11px] lowercase text-secondary">
+                          round name
                         </label>
-                        <input
+                        <Input
                           type="text"
                           disabled={!isLobby}
                           value={cfgName}
@@ -891,15 +877,14 @@ export default function AdminPortalPage() {
                             setCfgName(e.target.value);
                             setConfigDirty(true);
                           }}
-                          className="h-9 w-full rounded-[var(--radius-sm)] border border-border bg-subtle px-3 text-xs text-foreground focus:border-accent focus:outline-none disabled:opacity-50"
                         />
                       </div>
 
-                      <div>
-                        <label className="mb-1.5 block font-mono text-[11px] lowercase text-muted">
+                      <div className="space-y-1.5">
+                        <label className="block font-mono text-[11px] lowercase text-secondary">
                           duration (seconds, default 180)
                         </label>
-                        <input
+                        <Input
                           type="number"
                           min={30}
                           max={1800}
@@ -909,7 +894,7 @@ export default function AdminPortalPage() {
                             setCfgDuration(Number(e.target.value));
                             setConfigDirty(true);
                           }}
-                          className="h-9 w-full rounded-[var(--radius-sm)] border border-border bg-subtle px-3 font-mono text-xs text-foreground tabular-nums focus:border-accent focus:outline-none disabled:opacity-50"
+                          className="font-mono tabular-nums"
                         />
                       </div>
                     </div>
@@ -917,15 +902,15 @@ export default function AdminPortalPage() {
                     {/* Question Pool Allocation */}
                     <div className="space-y-2">
                       <Label>
-                        pool allocation (total:{" "}
-                        {cfgEasyCount + cfgMediumCount + cfgHardCount} questions)
+                        question pool ({cfgEasyCount + cfgMediumCount + cfgHardCount}{" "}
+                        total)
                       </Label>
                       <div className="grid gap-3 sm:grid-cols-3">
-                        <div className="rounded-[var(--radius-sm)] border border-border bg-subtle p-3">
-                          <label className="block font-mono text-[11px] text-ok">
-                            easy ({enabledCounts.EASY} avail)
+                        <div className="space-y-1.5">
+                          <label className="block font-mono text-[11px] text-success">
+                            easy ({enabledCounts.EASY} in bank)
                           </label>
-                          <input
+                          <Input
                             type="number"
                             min={1}
                             max={enabledCounts.EASY}
@@ -935,15 +920,15 @@ export default function AdminPortalPage() {
                               setCfgEasyCount(Number(e.target.value));
                               setConfigDirty(true);
                             }}
-                            className="mt-1.5 h-8 w-full rounded-[var(--radius-xs)] border border-border bg-surface px-2.5 font-mono text-xs text-foreground tabular-nums"
+                            className="font-mono tabular-nums"
                           />
                         </div>
 
-                        <div className="rounded-[var(--radius-sm)] border border-border bg-subtle p-3">
-                          <label className="block font-mono text-[11px] text-foreground">
-                            medium ({enabledCounts.MEDIUM} avail)
+                        <div className="space-y-1.5">
+                          <label className="block font-mono text-[11px] text-brand-light">
+                            medium ({enabledCounts.MEDIUM} in bank)
                           </label>
-                          <input
+                          <Input
                             type="number"
                             min={1}
                             max={enabledCounts.MEDIUM}
@@ -953,15 +938,15 @@ export default function AdminPortalPage() {
                               setCfgMediumCount(Number(e.target.value));
                               setConfigDirty(true);
                             }}
-                            className="mt-1.5 h-8 w-full rounded-[var(--radius-xs)] border border-border bg-surface px-2.5 font-mono text-xs text-foreground tabular-nums"
+                            className="font-mono tabular-nums"
                           />
                         </div>
 
-                        <div className="rounded-[var(--radius-sm)] border border-border bg-subtle p-3">
-                          <label className="block font-mono text-[11px] text-accent">
-                            hard ({enabledCounts.HARD} avail)
+                        <div className="space-y-1.5">
+                          <label className="block font-mono text-[11px] text-signal">
+                            hard ({enabledCounts.HARD} in bank)
                           </label>
-                          <input
+                          <Input
                             type="number"
                             min={1}
                             max={enabledCounts.HARD}
@@ -971,7 +956,7 @@ export default function AdminPortalPage() {
                               setCfgHardCount(Number(e.target.value));
                               setConfigDirty(true);
                             }}
-                            className="mt-1.5 h-8 w-full rounded-[var(--radius-xs)] border border-border bg-surface px-2.5 font-mono text-xs text-foreground tabular-nums"
+                            className="font-mono tabular-nums"
                           />
                         </div>
                       </div>
@@ -979,13 +964,13 @@ export default function AdminPortalPage() {
 
                     {/* Step Rewards */}
                     <div className="space-y-2">
-                      <Label>gear step deltas</Label>
+                      <Label>movement step rewards</Label>
                       <div className="grid gap-3 sm:grid-cols-3">
-                        <div>
-                          <label className="mb-1 block font-mono text-[11px] text-ok">
-                            easy delta
+                        <div className="space-y-1.5">
+                          <label className="block font-mono text-[11px] text-success">
+                            easy steps
                           </label>
-                          <input
+                          <Input
                             type="number"
                             min={1}
                             max={10}
@@ -995,14 +980,14 @@ export default function AdminPortalPage() {
                               setCfgEasyReward(Number(e.target.value));
                               setConfigDirty(true);
                             }}
-                            className="h-8 w-full rounded-[var(--radius-xs)] border border-border bg-subtle px-2.5 font-mono text-xs text-foreground tabular-nums"
+                            className="font-mono tabular-nums"
                           />
                         </div>
-                        <div>
-                          <label className="mb-1 block font-mono text-[11px] text-foreground">
-                            medium delta
+                        <div className="space-y-1.5">
+                          <label className="block font-mono text-[11px] text-brand-light">
+                            medium steps
                           </label>
-                          <input
+                          <Input
                             type="number"
                             min={1}
                             max={10}
@@ -1012,14 +997,14 @@ export default function AdminPortalPage() {
                               setCfgMediumReward(Number(e.target.value));
                               setConfigDirty(true);
                             }}
-                            className="h-8 w-full rounded-[var(--radius-xs)] border border-border bg-subtle px-2.5 font-mono text-xs text-foreground tabular-nums"
+                            className="font-mono tabular-nums"
                           />
                         </div>
-                        <div>
-                          <label className="mb-1 block font-mono text-[11px] text-accent">
-                            hard delta
+                        <div className="space-y-1.5">
+                          <label className="block font-mono text-[11px] text-signal">
+                            hard steps
                           </label>
-                          <input
+                          <Input
                             type="number"
                             min={1}
                             max={10}
@@ -1029,21 +1014,21 @@ export default function AdminPortalPage() {
                               setCfgHardReward(Number(e.target.value));
                               setConfigDirty(true);
                             }}
-                            className="h-8 w-full rounded-[var(--radius-xs)] border border-border bg-subtle px-2.5 font-mono text-xs text-foreground tabular-nums"
+                            className="font-mono tabular-nums"
                           />
                         </div>
                       </div>
                     </div>
 
                     {/* Abandon Toggle */}
-                    <div className="flex items-center justify-between rounded-[var(--radius-sm)] border border-border bg-subtle p-3">
+                    <div className="flex items-center justify-between rounded-[var(--radius-default)] border border-border bg-background p-3.5">
                       <div className="pr-3">
                         <p className="text-xs font-medium text-foreground">
-                          Permit strategic question abandonment
+                          Allow players to skip questions
                         </p>
-                        <p className="text-[11px] text-muted">
-                          Abandoned questions grant 0 steps, never reveal the
-                          solution, and burn that question for the driver.
+                        <p className="text-[11px] text-secondary">
+                          Skipped questions grant 0 steps, never reveal the
+                          answer, and cannot be reused by that player.
                         </p>
                       </div>
                       <input
@@ -1054,7 +1039,7 @@ export default function AdminPortalPage() {
                           setCfgAllowAbandon(e.target.checked);
                           setConfigDirty(true);
                         }}
-                        className="size-4 accent-[var(--accent)]"
+                        className="size-4 accent-[var(--brand)]"
                       />
                     </div>
 
@@ -1064,34 +1049,34 @@ export default function AdminPortalPage() {
                           type="submit"
                           disabled={busy || !configDirty}
                         >
-                          Save calibration
+                          Save configuration
                         </Button>
                       </div>
                     )}
                   </form>
                 </Panel>
 
-                {/* Right Column: Join QR & Telemetry Summary */}
+                {/* Right Column: Join QR & Summary */}
                 <Panel
-                  index="03"
-                  label="onboarding / qr & specs"
+                  index="join"
+                  label="qr & summary"
                   rightSlot={
                     <Button
                       variant="secondary"
                       size="xs"
                       onClick={() => setShowLargeQr(true)}
                     >
-                      <Maximize2 className="size-3 text-accent" />
-                      <span>enlarge</span>
+                      <Maximize2 className="size-3 text-brand-light" />
+                      <span>Enlarge</span>
                     </Button>
                   }
                 >
-                  <div className="p-4 space-y-4">
+                  <div className="p-5 space-y-4">
                     <button
                       type="button"
                       onClick={() => setShowLargeQr(true)}
-                      title="Click to enlarge QR code"
-                      className="mx-auto flex w-fit overflow-hidden rounded-[var(--radius-sm)] border border-border bg-white p-1.5 transition-transform active:scale-95 cursor-pointer"
+                      title="Enlarge QR code"
+                      className="mx-auto flex w-fit overflow-hidden rounded-[var(--radius-default)] border border-border bg-white p-1.5 transition-transform duration-[var(--duration-ui)] active:scale-95 cursor-pointer"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -1100,27 +1085,27 @@ export default function AdminPortalPage() {
                         className="size-36 block"
                       />
                     </button>
-                    <p className="text-center font-mono text-xs text-accent break-all">
+                    <p className="text-center font-mono text-xs text-brand-light break-all">
                       {joinUrl}
                     </p>
 
                     <div className="space-y-2 border-t border-border pt-3 font-mono text-xs tabular-nums">
                       <div className="flex justify-between">
-                        <span className="text-muted">duration</span>
+                        <span className="text-secondary">duration</span>
                         <span className="text-foreground">
                           {race.durationSec}s ({Math.floor(race.durationSec / 60)}m{" "}
                           {race.durationSec % 60}s)
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted">race pool</span>
+                        <span className="text-secondary">pool</span>
                         <span className="text-foreground">
                           {race.easyCount}E / {race.mediumCount}M / {race.hardCount}H
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted">wrong penalty</span>
-                        <span className="text-danger">3.0s pit limiter</span>
+                        <span className="text-secondary">wrong penalty</span>
+                        <span className="text-danger">3.0s cooldown</span>
                       </div>
                     </div>
                   </div>
@@ -1129,48 +1114,48 @@ export default function AdminPortalPage() {
             </div>
           )}
 
-          {/* TAB 2: DRIVER GRID & MODERATION */}
+          {/* TAB 2: PLAYERS & MODERATION */}
           {activeTab === "players" && (
             <Panel
-              index="02"
-              label={`roster / driver grid (${players.length})`}
+              index="roster"
+              label={`players (${players.length})`}
               rightSlot={
                 <div className="relative">
-                  <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted" />
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-secondary" />
                   <input
                     type="search"
                     value={playerSearch}
                     onChange={(e) => setPlayerSearch(e.target.value)}
-                    placeholder="Filter callsign..."
-                    className="h-7 w-44 rounded-[var(--radius-xs)] border border-border bg-surface pl-8 pr-2.5 font-mono text-xs text-foreground placeholder:text-dim focus:border-accent focus:outline-none"
+                    placeholder="Search player..."
+                    className="h-8 w-44 rounded-[var(--radius-default)] border border-border bg-elevated pl-8 pr-2.5 font-sans text-xs text-foreground placeholder:text-muted focus:border-brand-light focus:outline-none"
                   />
                 </div>
               }
             >
               {filteredPlayers.length === 0 ? (
-                <div className="p-10 text-center font-mono text-xs text-muted">
+                <div className="p-10 text-center text-xs text-secondary">
                   {players.length === 0
-                    ? "No drivers have locked onto the grid for this session yet."
-                    : "No drivers match your search filter."}
+                    ? "No players have joined this round yet."
+                    : "No players match your search."}
                 </div>
               ) : (
                 <Table>
                   <TableHead>
                     <tr>
                       <TableHeaderCell>pos</TableHeaderCell>
-                      <TableHeaderCell>unit</TableHeaderCell>
-                      <TableHeaderCell>callsign</TableHeaderCell>
+                      <TableHeaderCell>car</TableHeaderCell>
+                      <TableHeaderCell>nickname</TableHeaderCell>
                       <TableHeaderCell>steps</TableHeaderCell>
-                      <TableHeaderCell>hit / miss / burn</TableHeaderCell>
+                      <TableHeaderCell>correct / wrong / skipped</TableHeaderCell>
                       <TableHeaderCell className="text-right">
-                        moderation
+                        actions
                       </TableHeaderCell>
                     </tr>
                   </TableHead>
                   <TableBody>
                     {filteredPlayers.map((p) => (
                       <TableRow key={p.id}>
-                        <TableCell className="font-mono font-semibold text-accent tabular-nums">
+                        <TableCell className="font-mono font-medium text-foreground tabular-nums">
                           P{p.rank}
                         </TableCell>
                         <TableCell>
@@ -1187,35 +1172,35 @@ export default function AdminPortalPage() {
                                 type="text"
                                 value={editingNickname}
                                 onChange={(e) => setEditingNickname(e.target.value)}
-                                className="h-7 rounded-[var(--radius-xs)] border border-accent bg-subtle px-2 font-mono text-xs text-foreground focus:outline-none"
+                                className="h-8 rounded-[var(--radius-default)] border border-brand-light bg-elevated px-2.5 text-xs text-foreground focus:outline-none"
                               />
                               <Button
                                 size="xs"
                                 onClick={() => void handleRenamePlayer(p.id)}
                               >
-                                save
+                                Save
                               </Button>
                               <Button
                                 variant="secondary"
                                 size="xs"
                                 onClick={() => setEditingPlayerId(null)}
                               >
-                                cancel
+                                Cancel
                               </Button>
                             </div>
                           ) : (
                             p.nickname
                           )}
                         </TableCell>
-                        <TableCell className="font-mono text-sm font-semibold text-foreground tabular-nums">
+                        <TableCell className="font-mono text-sm font-medium text-foreground tabular-nums">
                           {p.totalSteps}
                         </TableCell>
                         <TableCell className="font-mono tabular-nums">
-                          <span className="text-ok">{p.correctCount}✓</span>
-                          <span className="mx-1 text-dim">/</span>
-                          <span className="text-danger">{p.wrongCount}✗</span>
-                          <span className="mx-1 text-dim">/</span>
-                          <span className="text-muted">{p.abandonedCount}↺</span>
+                          <span className="text-success">{p.correctCount}</span>
+                          <span className="mx-1.5 text-muted">/</span>
+                          <span className="text-danger">{p.wrongCount}</span>
+                          <span className="mx-1.5 text-muted">/</span>
+                          <span className="text-secondary">{p.abandonedCount}</span>
                         </TableCell>
                         <TableCell className="text-right space-x-1.5 whitespace-nowrap">
                           <Button
@@ -1226,7 +1211,7 @@ export default function AdminPortalPage() {
                               setEditingNickname(p.nickname);
                             }}
                           >
-                            rename
+                            Rename
                           </Button>
                           {confirmKey === `rm-${p.id}` ? (
                             <Button
@@ -1234,7 +1219,7 @@ export default function AdminPortalPage() {
                               size="xs"
                               onClick={() => void handleRemovePlayer(p.id)}
                             >
-                              confirm remove
+                              Confirm remove
                             </Button>
                           ) : (
                             <Button
@@ -1244,7 +1229,7 @@ export default function AdminPortalPage() {
                               className="text-danger hover:text-danger"
                             >
                               <Trash2 className="size-3" />
-                              <span>remove</span>
+                              <span>Remove</span>
                             </Button>
                           )}
                         </TableCell>
@@ -1260,13 +1245,13 @@ export default function AdminPortalPage() {
           {activeTab === "questions" && (
             <div className="space-y-4">
               <Panel
-                index="03"
-                label={`telemetry bank (${questions.length} total)`}
+                index="bank"
+                label={`questions (${questions.length} total)`}
                 rightSlot={
                   <div className="flex flex-wrap items-center gap-2">
-                    <label className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-sm)] border border-border bg-elevated px-2.5 font-mono text-xs text-foreground transition-colors hover:border-border-strong cursor-pointer">
-                      <Upload className="size-3.5 text-accent" />
-                      <span>import json</span>
+                    <label className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-default)] border border-border bg-elevated px-3 text-xs font-medium text-foreground transition-colors duration-[var(--duration-ui)] hover:border-border-strong cursor-pointer">
+                      <Upload className="size-3.5 text-secondary" />
+                      <span>Import JSON</span>
                       <input
                         type="file"
                         accept=".json"
@@ -1276,7 +1261,7 @@ export default function AdminPortalPage() {
                     </label>
                     <Button size="sm" onClick={openNewQuestionModal}>
                       <Plus className="size-3.5" />
-                      <span>new question</span>
+                      <span>Add question</span>
                     </Button>
                   </div>
                 }
@@ -1289,10 +1274,10 @@ export default function AdminPortalPage() {
                         type="button"
                         onClick={() => setFilterDiff(d)}
                         className={cn(
-                          "rounded-[var(--radius-xs)] border px-2.5 py-1 font-mono text-[11px] lowercase transition-colors cursor-pointer",
+                          "rounded-[var(--radius-default)] border px-2.5 py-1 font-mono text-xs lowercase transition-colors duration-[var(--duration-ui)] cursor-pointer",
                           filterDiff === d
-                            ? "border-accent bg-accent text-accent-fg font-semibold"
-                            : "border-border bg-subtle text-muted hover:text-foreground",
+                            ? "border-brand-light/40 bg-brand-subtle text-brand-light font-medium"
+                            : "border-border bg-elevated text-secondary hover:text-foreground",
                         )}
                       >
                         {d.toLowerCase()}
@@ -1302,9 +1287,9 @@ export default function AdminPortalPage() {
                     <select
                       value={filterCat}
                       onChange={(e) => setFilterCat(e.target.value)}
-                      className="h-7 rounded-[var(--radius-xs)] border border-border bg-subtle px-2.5 font-mono text-xs text-foreground focus:border-accent focus:outline-none"
+                      className="h-8 rounded-[var(--radius-default)] border border-border bg-elevated px-2.5 text-xs text-foreground focus:border-brand-light focus:outline-none"
                     >
-                      <option value="ALL">all categories</option>
+                      <option value="ALL">All categories</option>
                       <option value="HTML">HTML</option>
                       <option value="CSS">CSS</option>
                       <option value="JavaScript">JavaScript</option>
@@ -1316,13 +1301,13 @@ export default function AdminPortalPage() {
                   </div>
 
                   <div className="relative flex-1 min-w-[200px] max-w-xs">
-                    <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted" />
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-secondary" />
                     <input
                       type="search"
                       value={questionSearch}
                       onChange={(e) => setQuestionSearch(e.target.value)}
-                      placeholder="Search prompt or code..."
-                      className="h-7 w-full rounded-[var(--radius-xs)] border border-border bg-subtle pl-8 pr-2.5 font-mono text-xs text-foreground placeholder:text-dim focus:border-accent focus:outline-none"
+                      placeholder="Search questions..."
+                      className="h-8 w-full rounded-[var(--radius-default)] border border-border bg-elevated pl-8 pr-2.5 text-xs text-foreground placeholder:text-muted focus:border-brand-light focus:outline-none"
                     />
                   </div>
                 </div>
@@ -1331,28 +1316,25 @@ export default function AdminPortalPage() {
               {/* Question Rows */}
               <div className="space-y-2.5">
                 {filteredQuestions.map((q) => (
-                  <div
+                  <Card
                     key={q.id}
-                    className={cn(
-                      "rounded-[var(--radius-md)] border border-border bg-surface p-4 space-y-2.5 transition-opacity",
-                      !q.enabled && "opacity-50",
-                    )}
+                    className={cn("p-4 space-y-2.5", !q.enabled && "opacity-45")}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <Chip
                           tone={
                             q.difficulty === "EASY"
-                              ? "ok"
+                              ? "success"
                               : q.difficulty === "HARD"
-                                ? "accent"
-                                : "strong"
+                                ? "signal"
+                                : "brand"
                           }
                         >
                           {q.difficulty.toLowerCase()}
                         </Chip>
                         <Chip tone="neutral">{q.category}</Chip>
-                        <Chip tone={q.enabled ? "ok" : "neutral"} dot>
+                        <Chip tone={q.enabled ? "success" : "neutral"} dot>
                           {q.enabled ? "enabled" : "disabled"}
                         </Chip>
                       </div>
@@ -1365,14 +1347,14 @@ export default function AdminPortalPage() {
                             void handleToggleQuestion(q.id, !q.enabled)
                           }
                         >
-                          {q.enabled ? "disable" : "enable"}
+                          {q.enabled ? "Disable" : "Enable"}
                         </Button>
                         <Button
                           variant="secondary"
                           size="xs"
                           onClick={() => openEditQuestionModal(q)}
                         >
-                          edit
+                          Edit
                         </Button>
                         <Button
                           variant="ghost"
@@ -1380,7 +1362,7 @@ export default function AdminPortalPage() {
                           onClick={() => void handleDeleteQuestion(q.id)}
                           className="text-danger hover:text-danger"
                         >
-                          delete
+                          Delete
                         </Button>
                       </div>
                     </div>
@@ -1395,17 +1377,17 @@ export default function AdminPortalPage() {
                         <div
                           key={idx}
                           className={cn(
-                            "rounded-[var(--radius-xs)] border px-2.5 py-1.5 font-mono text-xs",
+                            "rounded-[var(--radius-default)] border px-2.5 py-1.5 font-mono text-xs",
                             idx === q.correctIndex
-                              ? "border-ok/50 bg-ok-subtle text-foreground font-medium"
-                              : "border-border bg-subtle text-muted",
+                              ? "border-success/40 bg-success-subtle text-foreground"
+                              : "border-border bg-background text-secondary",
                           )}
                         >
                           {["A", "B", "C", "D"][idx]}. {opt}
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </Card>
                 ))}
               </div>
             </div>
@@ -1415,55 +1397,54 @@ export default function AdminPortalPage() {
           {activeTab === "results" && (
             <div className="space-y-4">
               <Panel
-                index="04"
-                label="classification / official export"
+                index="results"
+                label="standings & csv export"
                 rightSlot={
                   <a
                     href={`/api/admin/export?raceId=${race.id}`}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-sm)] bg-accent px-3 font-mono text-xs font-medium text-accent-fg"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-default)] bg-brand px-3 font-sans text-xs font-medium text-foreground"
                   >
                     <Download className="size-3.5" />
-                    <span>export current csv</span>
+                    <span>Export current CSV</span>
                   </a>
                 }
               >
-                <div className="p-4 text-xs text-muted">
-                  Tie-breaker hierarchy: total movement steps (desc) → total
-                  correct answers (desc) → earliest server timestamp of final
-                  step.
+                <div className="p-4 text-xs text-secondary">
+                  Ranking order: total movement steps (desc) → total correct
+                  answers (desc) → earliest server timestamp of final step.
                 </div>
               </Panel>
 
               {history.length === 0 ? (
-                <div className="rounded-[var(--radius-md)] border border-border bg-surface p-8 text-center font-mono text-xs text-muted">
-                  No archived rounds yet. Completed sessions are logged here
+                <Card className="p-8 text-center text-xs text-secondary">
+                  No archived rounds yet. Completed rounds appear here
                   automatically when ended or when a new round is created.
-                </div>
+                </Card>
               ) : (
                 <div className="space-y-3">
                   {history.map((item) => (
-                    <div
+                    <Card
                       key={item.race.id}
-                      className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-border bg-surface p-4"
+                      className="flex flex-wrap items-center justify-between gap-3 p-4"
                     >
                       <div>
-                        <h3 className="font-sans text-sm font-semibold text-foreground">
+                        <h3 className="font-sans text-sm font-medium text-foreground">
                           {item.race.name}
                         </h3>
-                        <p className="font-mono text-xs text-muted tabular-nums">
-                          {item.standings.length} drivers · P1:{" "}
+                        <p className="font-mono text-xs text-secondary tabular-nums">
+                          {item.standings.length} players · Winner:{" "}
                           {item.standings[0]?.nickname ?? "N/A"} (
                           {item.standings[0]?.totalSteps ?? 0} steps)
                         </p>
                       </div>
                       <a
                         href={`/api/admin/export?raceId=${item.race.id}`}
-                        className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-sm)] border border-border bg-elevated px-3 font-mono text-xs text-foreground hover:border-border-strong"
+                        className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-default)] border border-border bg-elevated px-3 text-xs font-medium text-foreground hover:border-border-strong"
                       >
-                        <Download className="size-3.5 text-accent" />
-                        <span>download csv</span>
+                        <Download className="size-3.5 text-secondary" />
+                        <span>Download CSV</span>
                       </a>
-                    </div>
+                    </Card>
                   ))}
                 </div>
               )}
@@ -1474,47 +1455,47 @@ export default function AdminPortalPage() {
 
       {/* Add / Edit Question Modal */}
       {showQuestionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/85 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/85 p-4">
           <form
             onSubmit={handleSaveQuestion}
-            className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[var(--radius-md)] border border-border-strong bg-surface p-6 space-y-4"
+            className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[var(--radius-default)] border border-border-strong bg-surface p-6 space-y-4"
           >
             <div className="flex items-center justify-between border-b border-border pb-3">
-              <Label index="bank" tone="accent">
-                {qId ? "edit telemetry item" : "new telemetry item"}
+              <Label index="question">
+                {qId ? "edit question" : "new question"}
               </Label>
               <button
                 type="button"
                 onClick={() => setShowQuestionModal(false)}
-                className="text-muted hover:text-foreground cursor-pointer"
+                className="text-secondary hover:text-foreground cursor-pointer"
               >
                 <X className="size-4" />
               </button>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="mb-1 block font-mono text-[11px] text-muted">
-                  gear difficulty
+              <div className="space-y-1">
+                <label className="block font-mono text-[11px] text-secondary">
+                  difficulty
                 </label>
                 <select
                   value={qDiff}
                   onChange={(e) => setQDiff(e.target.value as Difficulty)}
-                  className="h-9 w-full rounded-[var(--radius-sm)] border border-border bg-subtle px-3 font-mono text-xs text-foreground"
+                  className="h-10 w-full rounded-[var(--radius-default)] border border-border bg-elevated px-3 text-xs text-foreground"
                 >
                   <option value="EASY">EASY</option>
                   <option value="MEDIUM">MEDIUM</option>
                   <option value="HARD">HARD</option>
                 </select>
               </div>
-              <div>
-                <label className="mb-1 block font-mono text-[11px] text-muted">
+              <div className="space-y-1">
+                <label className="block font-mono text-[11px] text-secondary">
                   category
                 </label>
                 <select
                   value={qCat}
                   onChange={(e) => setQCat(e.target.value as QuestionCategory)}
-                  className="h-9 w-full rounded-[var(--radius-sm)] border border-border bg-subtle px-3 font-mono text-xs text-foreground"
+                  className="h-10 w-full rounded-[var(--radius-default)] border border-border bg-elevated px-3 text-xs text-foreground"
                 >
                   <option value="HTML">HTML</option>
                   <option value="CSS">CSS</option>
@@ -1527,8 +1508,8 @@ export default function AdminPortalPage() {
               </div>
             </div>
 
-            <div>
-              <label className="mb-1 block font-mono text-[11px] text-muted">
+            <div className="space-y-1">
+              <label className="block font-mono text-[11px] text-secondary">
                 question prompt
               </label>
               <textarea
@@ -1536,24 +1517,24 @@ export default function AdminPortalPage() {
                 rows={2}
                 value={qPrompt}
                 onChange={(e) => setQPrompt(e.target.value)}
-                className="w-full rounded-[var(--radius-sm)] border border-border bg-subtle p-2.5 text-sm text-foreground"
+                className="w-full rounded-[var(--radius-default)] border border-border bg-elevated p-2.5 text-sm text-foreground focus:border-brand-light focus:outline-none"
               />
             </div>
 
-            <div>
-              <label className="mb-1 block font-mono text-[11px] text-muted">
+            <div className="space-y-1">
+              <label className="block font-mono text-[11px] text-secondary">
                 optional code snippet
               </label>
               <textarea
                 rows={3}
                 value={qCode}
                 onChange={(e) => setQCode(e.target.value)}
-                className="w-full rounded-[var(--radius-sm)] border border-border bg-subtle p-2.5 font-mono text-xs text-foreground"
+                className="w-full rounded-[var(--radius-default)] border border-border bg-background p-2.5 font-mono text-xs text-foreground focus:border-brand-light focus:outline-none"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="block font-mono text-[11px] text-muted">
+              <label className="block font-mono text-[11px] text-secondary">
                 answer options (select radio for correct option)
               </label>
               {[
@@ -1568,15 +1549,15 @@ export default function AdminPortalPage() {
                     name="correctIndex"
                     checked={qCorrect === item.idx}
                     onChange={() => setQCorrect(item.idx)}
-                    className="size-4 accent-[var(--semantic-ok)]"
+                    className="size-4 accent-[var(--success)]"
                   />
-                  <input
+                  <Input
                     type="text"
                     required
                     placeholder={`Option ${["A", "B", "C", "D"][item.idx]}`}
                     value={item.val}
                     onChange={(e) => item.set(e.target.value)}
-                    className="h-9 flex-1 rounded-[var(--radius-sm)] border border-border bg-subtle px-3 text-xs text-foreground"
+                    className="h-9 flex-1 text-xs"
                   />
                 </div>
               ))}
@@ -1590,7 +1571,7 @@ export default function AdminPortalPage() {
                 Cancel
               </Button>
               <Button type="submit" disabled={busy}>
-                Save item
+                Save question
               </Button>
             </div>
           </form>
@@ -1601,19 +1582,17 @@ export default function AdminPortalPage() {
       {showLargeQr && (
         <div
           onClick={() => setShowLargeQr(false)}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 p-4"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-2xl rounded-[var(--radius-md)] border border-border-strong bg-surface p-6 text-center space-y-5"
+            className="w-full max-w-2xl rounded-[var(--radius-default)] border border-border-strong bg-surface p-6 text-center space-y-5"
           >
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div className="text-left">
-                <Label index="qr" tone="accent">
-                  driver onboarding
-                </Label>
-                <h3 className="mt-1 font-sans text-lg font-semibold text-foreground">
-                  {race.name} · {players.length} drivers on grid
+                <Label index="join">scan to enter grid</Label>
+                <h3 className="mt-1 font-sans text-lg font-medium text-foreground">
+                  {race.name} · {players.length} players joined
                 </h3>
               </div>
               <Button
@@ -1622,11 +1601,11 @@ export default function AdminPortalPage() {
                 onClick={() => setShowLargeQr(false)}
               >
                 <X className="size-3.5" />
-                <span>close</span>
+                <span>Close</span>
               </Button>
             </div>
 
-            <div className="mx-auto flex w-fit overflow-hidden rounded-[var(--radius-md)] border border-border bg-white p-3">
+            <div className="mx-auto flex w-fit overflow-hidden rounded-[var(--radius-default)] border border-border bg-white p-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={`/api/qr?url=${encodeURIComponent(joinUrl)}`}
@@ -1636,11 +1615,11 @@ export default function AdminPortalPage() {
             </div>
 
             <div className="space-y-2">
-              <p className="font-mono text-xl sm:text-2xl font-semibold text-foreground break-all">
+              <p className="font-mono text-xl sm:text-2xl font-medium text-foreground break-all">
                 {joinUrl}
               </p>
               <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                <CopyButton value={joinUrl} label="copy /play link" />
+                <CopyButton value={joinUrl} label="Copy join link" />
                 {isLobby && (
                   <Button
                     variant="primary"
@@ -1652,7 +1631,7 @@ export default function AdminPortalPage() {
                     }}
                   >
                     <Play className="size-4 fill-current" />
-                    <span>Start race now ({players.length} drivers)</span>
+                    <span>Start race now ({players.length} players)</span>
                   </Button>
                 )}
               </div>

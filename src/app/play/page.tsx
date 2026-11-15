@@ -4,21 +4,21 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import {
-  AlertTriangle,
+  AlertCircle,
   ArrowLeft,
   CheckCircle2,
-  OctagonX,
   RotateCcw,
   Trophy,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Chip } from "@/components/ui/chip";
 import { CodeBlock } from "@/components/ui/code-block";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Panel } from "@/components/ui/panel";
 import { RaceCarSvg } from "@/components/ui/race-car-svg";
 import { Stat } from "@/components/ui/stat";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { triggerHaptic } from "@/lib/audio";
 import {
   getServerNowMs,
@@ -268,144 +268,131 @@ export default function PlayerPage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <div className="flex items-center gap-2.5 font-mono text-xs text-muted">
-          <span className="size-2 rounded-full bg-accent animate-pulse" />
-          <span>telemetry / syncing driver unit...</span>
-        </div>
+        <Label index="timing" tone="signal" dot>
+          syncing race state
+        </Label>
       </div>
     );
   }
 
   return (
-    <div className="respect-reduced-motion mx-auto flex min-h-screen w-full max-w-[430px] flex-col border-x border-border bg-background text-foreground pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-      {/* Sticky Telemetry Header */}
-      <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-md px-4 py-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5 min-w-0">
+    <div className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col border-x border-border bg-background text-foreground pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+      {/* Sticky Top Header */}
+      <header className="sticky top-0 z-30 border-b border-border bg-background/95 px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <Link
               href="/"
-              aria-label="Back to surfaces"
-              className="flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-border bg-surface text-muted transition-colors hover:text-foreground"
+              aria-label="Back to home"
+              className="flex size-9 shrink-0 items-center justify-center rounded-[var(--radius-default)] border border-border bg-surface text-secondary transition-colors duration-[var(--duration-ui)] hover:border-border-strong hover:text-foreground"
             >
               <ArrowLeft className="size-4" />
             </Link>
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="font-mono text-[10px] lowercase text-muted">
-                  01 / cockpit
-                </span>
-                <span className="text-dim">·</span>
-                <span className="truncate font-mono text-[11px] font-medium text-foreground">
-                  {activeRace?.name ?? "Round 1"}
-                </span>
-              </div>
+              <Label index="surface">
+                01 · {activeRace?.name ?? "Round 1"}
+              </Label>
               {view ? (
-                <p className="truncate font-sans text-xs font-semibold text-foreground tabular-nums">
-                  #{String(view.player.carNumber).padStart(2, "0")} {view.player.nickname}
+                <p className="truncate font-sans text-sm font-medium text-foreground tabular-nums">
+                  #{String(view.player.carNumber).padStart(2, "0")} · {view.player.nickname}
                 </p>
               ) : (
-                <p className="font-mono text-[11px] text-muted">unregistered unit</p>
+                <p className="font-sans text-sm font-medium text-secondary">
+                  Player Cockpit
+                </p>
               )}
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {view ? (
-              <>
-                <div className="rounded-[var(--radius-sm)] border border-border bg-surface px-2.5 py-1 text-right">
-                  <span className="block font-mono text-[9px] lowercase text-muted">
-                    steps
+          {view && (
+            <div className="flex items-center gap-2 font-mono tabular-nums">
+              <div className="rounded-[var(--radius-default)] border border-border bg-surface px-2.5 py-1 text-right">
+                <span className="block text-[10px] lowercase text-muted">
+                  steps
+                </span>
+                <span className="text-sm font-medium text-foreground">
+                  {view.player.totalSteps}
+                </span>
+              </div>
+              {effectiveStatus === "RACING" && (
+                <div
+                  className={cn(
+                    "rounded-[var(--radius-default)] border px-2.5 py-1 text-right",
+                    raceRemainingMs <= 10000
+                      ? "border-signal/50 bg-signal-subtle text-signal"
+                      : "border-border bg-surface text-foreground",
+                  )}
+                >
+                  <span className="block text-[10px] lowercase text-muted">
+                    clock
                   </span>
-                  <span className="font-mono text-sm font-semibold text-accent tabular-nums">
-                    {view.player.totalSteps}
+                  <span className="text-sm font-medium">
+                    {formattedRaceTimer}
                   </span>
                 </div>
-                {effectiveStatus === "RACING" && (
-                  <div
-                    className={cn(
-                      "rounded-[var(--radius-sm)] border px-2.5 py-1 text-right",
-                      raceRemainingMs <= 15000
-                        ? "border-danger bg-danger-subtle text-danger"
-                        : raceRemainingMs <= 30000
-                          ? "border-accent bg-accent-subtle text-accent"
-                          : "border-border bg-surface text-foreground",
-                    )}
-                  >
-                    <span className="block font-mono text-[9px] lowercase opacity-75">
-                      clock
-                    </span>
-                    <span className="font-mono text-sm font-semibold tabular-nums">
-                      {formattedRaceTimer}
-                    </span>
-                  </div>
-                )}
-              </>
-            ) : (
-              <ThemeToggle />
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="flex flex-1 flex-col px-4 py-4">
+      {/* Main Content */}
+      <main className="flex flex-1 flex-col px-4 py-5">
         {errorMsg && (
           <div
             role="alert"
-            className="mb-4 flex items-start gap-2.5 rounded-[var(--radius-sm)] border border-danger bg-danger-subtle p-3 font-mono text-xs text-danger"
+            className="mb-4 flex items-start gap-2.5 rounded-[var(--radius-default)] border border-danger/40 bg-danger-subtle p-3 text-xs text-danger"
           >
-            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+            <AlertCircle className="mt-0.5 size-4 shrink-0" />
             <span>{errorMsg}</span>
           </div>
         )}
 
         {/* 1. NOT JOINED YET -> JOIN SCREEN */}
         {!view ? (
-          <div className="my-auto space-y-5">
-            <Panel
-              index="01"
-              label="registration / driver entry"
-              rightSlot={
-                <Chip tone="neutral">
-                  {publicPlayerCount} on grid
-                </Chip>
-              }
-            >
-              <div className="p-5 space-y-5">
+          <div className="my-auto">
+            <Card>
+              <CardHeader>
+                <Label index="lobby">join race</Label>
+                <span className="font-mono text-xs text-secondary tabular-nums">
+                  {publicPlayerCount} joined
+                </span>
+              </CardHeader>
+              <CardBody className="space-y-5">
                 <div className="space-y-1.5">
-                  <h1 className="font-sans text-2xl font-semibold tracking-[-0.025em] text-foreground">
-                    Claim your telemetry unit.
+                  <h1 className="font-sans text-xl font-medium tracking-[-0.02em] text-foreground">
+                    Enter your nickname
                   </h1>
-                  <p className="text-xs leading-relaxed text-muted">
-                    Enter a callsign for the timing tower. Once race control drops
-                    the green flag, you choose your gear (+1, +2, or +3 steps) on
-                    every lap.
+                  <p className="text-xs leading-relaxed text-secondary">
+                    Choose a name for the leaderboard. Once the race starts, you
+                    pick Easy (+1), Medium (+2), or Hard (+3) questions at your
+                    own pace.
                   </p>
                 </div>
 
                 {effectiveStatus !== "LOBBY" ? (
-                  <div className="rounded-[var(--radius-sm)] border border-accent/40 bg-accent-subtle p-4 font-mono text-xs text-accent">
-                    Session is currently locked ({effectiveStatus.toLowerCase()}).
-                    Wait for race control to open the next round.
+                  <div className="rounded-[var(--radius-default)] border border-border bg-elevated p-4 text-xs text-secondary">
+                    This round is already in progress ({effectiveStatus.toLowerCase()}).
+                    Wait for the organizer to open the next round.
                   </div>
                 ) : (
                   <form onSubmit={handleJoin} className="space-y-4">
-                    <div>
+                    <div className="space-y-1.5">
                       <label
                         htmlFor="nickname-input"
-                        className="mb-1.5 block font-mono text-[11px] lowercase tracking-[0.04em] text-muted"
+                        className="block font-mono text-[11px] lowercase tracking-[0.04em] text-secondary"
                       >
-                        driver callsign (2–16 chars)
+                        nickname (2–16 characters)
                       </label>
-                      <input
+                      <Input
                         id="nickname-input"
                         type="text"
                         required
                         maxLength={16}
                         value={nickname}
                         onChange={(e) => setNickname(e.target.value)}
-                        placeholder="e.g. soliman.dev"
-                        className="h-12 w-full rounded-[var(--radius-sm)] border border-border bg-subtle px-3.5 font-mono text-sm text-foreground placeholder:text-dim focus:border-accent focus:outline-none"
+                        placeholder="e.g. soliman"
+                        className="h-12 text-base"
                       />
                     </div>
                     <Button
@@ -414,197 +401,180 @@ export default function PlayerPage() {
                       disabled={busyAction || nickname.trim().length < 2}
                       className="w-full"
                     >
-                      {busyAction ? "Locking onto grid..." : "Lock onto starting grid"}
+                      {busyAction ? "Joining..." : "Join race"}
                     </Button>
                   </form>
                 )}
-              </div>
-            </Panel>
+              </CardBody>
+            </Card>
           </div>
         ) : effectiveStatus === "LOBBY" ? (
           /* 2. LOBBY STATE */
-          <div className="my-auto space-y-4">
-            <Panel
-              index="02"
-              label="grid / standby"
-              rightSlot={<Chip tone="ok" dot>telemetry locked</Chip>}
-            >
-              <div className="p-5 space-y-5">
+          <div className="my-auto">
+            <Card>
+              <CardHeader>
+                <Label index="status" tone="success" dot>
+                  ready on grid
+                </Label>
+                <span className="font-mono text-xs text-muted tabular-nums">
+                  {view.race.durationSec}s round
+                </span>
+              </CardHeader>
+              <CardBody className="space-y-6">
                 <div className="flex items-center justify-between border-b border-border pb-4">
                   <div>
-                    <p className="font-mono text-[11px] text-muted">
-                      unit #{String(view.player.carNumber).padStart(2, "0")}
+                    <p className="font-mono text-xs text-secondary tabular-nums">
+                      car #{String(view.player.carNumber).padStart(2, "0")}
                     </p>
-                    <h2 className="font-sans text-xl font-semibold tracking-tight text-foreground">
+                    <h2 className="mt-0.5 font-sans text-xl font-medium tracking-[-0.02em] text-foreground">
                       {view.player.nickname}
                     </h2>
                   </div>
                   <RaceCarSvg
                     color={view.player.carColor}
                     carNumber={view.player.carNumber}
-                    size="md"
+                    size="lg"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label>gear reward calibration</Label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <Label>question rewards</Label>
+                  <div className="grid grid-cols-3 gap-2.5">
                     <Stat
                       label="easy"
                       value={`+${view.race.easyReward}`}
-                      tone="ok"
+                      tone="success"
                     />
                     <Stat
                       label="medium"
                       value={`+${view.race.mediumReward}`}
-                      tone="default"
+                      tone="brand"
                     />
                     <Stat
                       label="hard"
                       value={`+${view.race.hardReward}`}
-                      tone="accent"
+                      tone="signal"
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between rounded-[var(--radius-sm)] border border-border bg-subtle px-3.5 py-2.5 font-mono text-xs">
-                  <span className="text-muted">session length</span>
-                  <span className="text-foreground tabular-nums">
-                    {view.race.durationSec}s
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2 pt-1 font-mono text-xs text-accent">
-                  <span className="size-1.5 rounded-full bg-accent animate-ping" />
-                  <span>standing by for race control start signal...</span>
-                </div>
-              </div>
-            </Panel>
+                <p className="font-mono text-xs text-secondary">
+                  Waiting for the organizer to start the race...
+                </p>
+              </CardBody>
+            </Card>
           </div>
         ) : effectiveStatus === "COUNTDOWN" ? (
-          /* 3. PRE-START COUNTDOWN (3-2-1) */
+          /* 3. PRE-START COUNTDOWN */
           <div className="my-auto">
-            <Panel index="03" label="launch control / sequence">
-              <div className="flex flex-col items-center justify-center p-8 text-center">
-                <Label tone="accent">gantry lights active</Label>
+            <Card>
+              <CardBody className="flex flex-col items-center justify-center py-10 text-center">
+                <Label index="race" tone="signal" dot>
+                  starting in
+                </Label>
                 <div className="my-6 flex gap-3">
                   {[1, 2, 3, 4].map((light) => (
                     <div
                       key={light}
                       className={cn(
-                        "size-5 rounded-full border transition-colors",
+                        "size-4 rounded-full border transition-colors duration-[var(--duration-ui)]",
                         preStartSeconds <= 4 - light + 1
-                          ? "border-danger bg-danger"
-                          : "border-border-strong bg-subtle",
+                          ? "border-signal bg-signal"
+                          : "border-border-strong bg-elevated",
                       )}
                     />
                   ))}
                 </div>
-                <p className="font-mono text-6xl font-semibold tracking-tight text-foreground tabular-nums">
+                <p className="font-mono text-6xl font-medium tracking-tight text-foreground tabular-nums">
                   {preStartSeconds > 0 ? preStartSeconds : "GO"}
                 </p>
-              </div>
-            </Panel>
+              </CardBody>
+            </Card>
           </div>
         ) : effectiveStatus === "RACING" ? (
-          /* 4. ACTIVE RACE: FEEDBACK BANNER OR QUESTION VIEW OR DIFFICULTY SELECTION */
+          /* 4. ACTIVE RACE */
           <div className="flex flex-1 flex-col">
-            {/* Compact Driver Telemetry Strip */}
-            <div className="mb-3.5 flex items-center justify-between rounded-[var(--radius-sm)] border border-border bg-surface px-3 py-2 font-mono text-xs tabular-nums">
+            {/* Compact Position & Progress Strip */}
+            <div className="mb-4 flex items-center justify-between rounded-[var(--radius-default)] border border-border bg-surface px-3.5 py-2.5 font-mono text-xs tabular-nums">
               <div className="flex items-center gap-2.5">
                 <RaceCarSvg
                   color={view.player.carColor}
                   carNumber={view.player.carNumber}
                   size="sm"
                 />
-                <span className="text-muted">
-                  pos <strong className="text-foreground">P{view.player.rank}</strong>
+                <span
+                  className={cn(
+                    "font-medium",
+                    view.player.rank === 1 ? "text-signal" : "text-foreground",
+                  )}
+                >
+                  P{view.player.rank}
                 </span>
               </div>
-              <div className="flex items-center gap-3 text-[11px] text-muted">
-                <span>{view.player.correctCount} hit</span>
-                <span>·</span>
-                <span className="text-foreground font-semibold">
-                  {view.player.totalSteps} steps
-                </span>
-              </div>
+              <span className="text-secondary">
+                {view.player.correctCount} correct · {view.player.totalSteps} steps
+              </span>
             </div>
 
             <AnimatePresence mode="wait">
               {feedbackBanner ? (
                 <motion.div
                   key="feedback"
-                  initial={{ opacity: 0, scale: 0.98 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  transition={{ duration: 0.14 }}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.16 }}
                   className={cn(
-                    "my-auto flex flex-col items-center justify-center rounded-[var(--radius-md)] border p-8 text-center",
+                    "my-auto flex flex-col items-center justify-center rounded-[var(--radius-default)] border p-8 text-center",
                     feedbackBanner.outcome === "CORRECT"
-                      ? "border-ok bg-ok-subtle"
-                      : "border-danger bg-danger-subtle",
+                      ? "border-success/40 bg-success-subtle"
+                      : "border-danger/40 bg-danger-subtle",
                   )}
                 >
                   {feedbackBanner.outcome === "CORRECT" ? (
                     <>
-                      <CheckCircle2 className="size-10 text-ok" />
-                      <p className="mt-3 font-mono text-xs lowercase text-ok">
-                        telemetry verified
-                      </p>
-                      <h2 className="mt-1 font-mono text-3xl font-semibold text-foreground tabular-nums">
+                      <CheckCircle2 className="size-9 text-success" />
+                      <h2 className="mt-3 font-mono text-2xl font-medium text-foreground tabular-nums">
                         +{feedbackBanner.stepsEarned}{" "}
                         {feedbackBanner.stepsEarned === 1 ? "step" : "steps"}
                       </h2>
-                      <p className="mt-1 font-mono text-xs text-muted tabular-nums">
-                        odometer → {view.player.totalSteps} steps
+                      <p className="mt-1 font-mono text-xs text-secondary tabular-nums">
+                        Total progress: {view.player.totalSteps} steps
                       </p>
-                      <motion.div
-                        initial={{ x: -30 }}
-                        animate={{ x: 30 }}
-                        transition={{ duration: 0.45, ease: "easeOut" }}
-                        className="mt-5"
-                      >
-                        <RaceCarSvg
-                          color={view.player.carColor}
-                          carNumber={view.player.carNumber}
-                          size="md"
-                        />
-                      </motion.div>
                     </>
                   ) : (
                     <>
-                      <OctagonX className="size-10 text-danger" />
-                      <p className="mt-3 font-mono text-xs lowercase text-danger">
-                        misfire / 0 steps
-                      </p>
-                      <h2 className="mt-1 font-sans text-xl font-semibold text-foreground">
-                        3.0s pit-lane limiter engaged
+                      <XCircle className="size-9 text-danger" />
+                      <h2 className="mt-3 font-sans text-lg font-medium text-foreground">
+                        Incorrect · 0 steps
                       </h2>
+                      <p className="mt-1 font-mono text-xs text-secondary">
+                        3.0s cooldown before next question
+                      </p>
                     </>
                   )}
                 </motion.div>
               ) : view.activeAttempt ? (
-                /* QUESTION INTERFACE */
+                /* QUESTION VIEW (one question per screen) */
                 <motion.div
                   key={view.activeAttempt.attemptId}
-                  initial={{ opacity: 0, y: 6 }}
+                  initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.14 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.16 }}
                   className="flex flex-1 flex-col justify-between space-y-4"
                 >
                   <div className="space-y-3">
-                    {/* Gear & Sector Header */}
+                    {/* Difficulty & Category Header */}
                     <div className="flex items-center justify-between">
                       <Chip
                         tone={
                           view.activeAttempt.difficulty === "EASY"
-                            ? "ok"
+                            ? "success"
                             : view.activeAttempt.difficulty === "HARD"
-                              ? "accent"
-                              : "strong"
+                              ? "signal"
+                              : "brand"
                         }
-                        dot
                       >
                         {view.activeAttempt.difficulty.toLowerCase()} · +
                         {view.activeAttempt.rewardSteps}{" "}
@@ -616,16 +586,18 @@ export default function PlayerPage() {
                     </div>
 
                     {/* Question Prompt Card */}
-                    <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4 space-y-3">
-                      <p className="font-sans text-[15px] font-medium leading-snug text-foreground">
-                        {view.activeAttempt.question.prompt}
-                      </p>
-                      {view.activeAttempt.question.codeSnippet && (
-                        <CodeBlock code={view.activeAttempt.question.codeSnippet} />
-                      )}
-                    </div>
+                    <Card>
+                      <CardBody className="space-y-3 p-4">
+                        <p className="font-sans text-base font-medium leading-snug text-foreground">
+                          {view.activeAttempt.question.prompt}
+                        </p>
+                        {view.activeAttempt.question.codeSnippet && (
+                          <CodeBlock code={view.activeAttempt.question.codeSnippet} />
+                        )}
+                      </CardBody>
+                    </Card>
 
-                    {/* 4 Thumb-Zone Answer Options */}
+                    {/* 4 Answer Options (48px+ touch targets) */}
                     <div className="space-y-2 pt-0.5">
                       {view.activeAttempt.question.options.map((opt, idx) => {
                         const letter = ["A", "B", "C", "D"][idx];
@@ -636,18 +608,18 @@ export default function PlayerPage() {
                             type="button"
                             onClick={() => setSelectedOption(idx)}
                             className={cn(
-                              "flex min-h-[54px] w-full items-center gap-3 rounded-[var(--radius-sm)] border px-3.5 py-2.5 text-left text-sm transition-colors active:translate-y-[1px] cursor-pointer",
+                              "flex min-h-[52px] w-full items-center gap-3 rounded-[var(--radius-default)] border px-3.5 py-2.5 text-left text-sm transition-colors duration-[var(--duration-ui)] active:translate-y-[1px] cursor-pointer",
                               isSelected
-                                ? "border-accent bg-accent-subtle text-foreground"
+                                ? "border-brand-light bg-brand-subtle text-foreground"
                                 : "border-border bg-surface text-foreground hover:border-border-strong",
                             )}
                           >
                             <span
                               className={cn(
-                                "flex size-6 shrink-0 items-center justify-center rounded-[var(--radius-xs)] font-mono text-xs font-semibold",
+                                "flex size-6 shrink-0 items-center justify-center rounded-[6px] font-mono text-xs font-medium",
                                 isSelected
-                                  ? "bg-accent text-accent-fg"
-                                  : "border border-border bg-subtle text-muted",
+                                  ? "bg-brand text-foreground"
+                                  : "border border-border bg-elevated text-secondary",
                               )}
                             >
                               {letter}
@@ -667,38 +639,38 @@ export default function PlayerPage() {
                       onClick={handleSubmitAnswer}
                       className="w-full"
                     >
-                      {busyAction ? "Transmitting..." : "Transmit answer"}
+                      {busyAction ? "Submitting..." : "Submit answer"}
                     </Button>
 
                     {view.race.allowAbandon && (
                       <Button
-                        variant="secondary"
+                        variant="ghost"
                         size="lg"
                         disabled={busyAction}
                         onClick={handleAbandonQuestion}
-                        className="w-full text-muted"
+                        className="w-full"
                       >
                         <RotateCcw className="size-3.5" />
-                        <span>Abandon question (0 steps, no penalty)</span>
+                        <span>Skip question (0 steps)</span>
                       </Button>
                     )}
                   </div>
                 </motion.div>
               ) : (
-                /* DIFFICULTY / GEAR SELECTION SCREEN */
+                /* DIFFICULTY SELECTION SCREEN */
                 <motion.div
                   key="difficulty-picker"
-                  initial={{ opacity: 0, y: 6 }}
+                  initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.14 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.16 }}
                   className="flex flex-1 flex-col justify-between space-y-4"
                 >
                   <div className="space-y-3.5">
-                    <div>
-                      <Label index="gear">select risk / reward</Label>
-                      <h1 className="mt-1 font-sans text-xl font-semibold tracking-[-0.02em] text-foreground">
-                        Call your next sector pace.
+                    <div className="space-y-1">
+                      <Label index="next">select difficulty</Label>
+                      <h1 className="font-sans text-xl font-medium tracking-[-0.02em] text-foreground">
+                        Choose your next question
                       </h1>
                     </div>
 
@@ -707,14 +679,11 @@ export default function PlayerPage() {
                       <div
                         role="status"
                         aria-live="polite"
-                        className="rounded-[var(--radius-sm)] border border-danger bg-danger-subtle p-3.5"
+                        className="rounded-[var(--radius-default)] border border-danger/40 bg-danger-subtle p-3.5"
                       >
                         <div className="flex items-center justify-between font-mono text-xs text-danger">
-                          <span className="flex items-center gap-1.5">
-                            <OctagonX className="size-3.5" />
-                            <span>pit-lane limiter active</span>
-                          </span>
-                          <span className="font-semibold tabular-nums">
+                          <span>Wrong answer cooldown</span>
+                          <span className="tabular-nums">
                             {(lockoutRemainingMs / 1000).toFixed(1)}s
                           </span>
                         </div>
@@ -729,39 +698,36 @@ export default function PlayerPage() {
                       </div>
                     )}
 
-                    {/* Three Thumb-Zone Gear Cards */}
+                    {/* Three Large Thumb-Zone Difficulty Cards */}
                     <div className="space-y-2.5 pt-0.5">
                       {(
                         [
                           {
                             tier: "EASY" as Difficulty,
-                            gear: "gear / 01",
+                            index: "01",
                             title: "Easy",
-                            subtitle: "Fundamentals & syntax. Fast, reliable pace.",
+                            subtitle: "Core syntax & fundamentals. Fast, safe progress.",
                             reward: view.race.easyReward,
                             remaining: view.remainingByDifficulty.EASY,
-                            chipTone: "ok" as const,
-                            hoverClass: "hover:border-ok/60",
+                            chipTone: "success" as const,
                           },
                           {
                             tier: "MEDIUM" as Difficulty,
-                            gear: "gear / 02",
+                            index: "02",
                             title: "Medium",
-                            subtitle: "DOM, APIs & component state. Balanced delta.",
+                            subtitle: "DOM, APIs & component state. Balanced reward.",
                             reward: view.race.mediumReward,
                             remaining: view.remainingByDifficulty.MEDIUM,
-                            chipTone: "strong" as const,
-                            hoverClass: "hover:border-border-strong",
+                            chipTone: "brand" as const,
                           },
                           {
                             tier: "HARD" as Difficulty,
-                            gear: "gear / 03",
+                            index: "03",
                             title: "Hard",
-                            subtitle: "Deep runtime & architecture edge cases.",
+                            subtitle: "Challenging technical questions. Maximum boost.",
                             reward: view.race.hardReward,
                             remaining: view.remainingByDifficulty.HARD,
-                            chipTone: "accent" as const,
-                            hoverClass: "border-accent/40 hover:border-accent",
+                            chipTone: "signal" as const,
                           },
                         ] as const
                       ).map((card) => {
@@ -773,19 +739,17 @@ export default function PlayerPage() {
                             disabled={exhausted || isLockedOut || busyAction}
                             onClick={() => handlePickDifficulty(card.tier)}
                             className={cn(
-                              "group relative flex min-h-[108px] w-full flex-col justify-between rounded-[var(--radius-md)] border border-border bg-surface p-4 text-left transition-all active:translate-y-[1px] cursor-pointer disabled:pointer-events-none",
-                              exhausted
-                                ? "hatch-stripe opacity-40"
-                                : card.hoverClass,
-                              isLockedOut && "opacity-55",
+                              "flex min-h-[104px] w-full flex-col justify-between rounded-[var(--radius-default)] border border-border bg-surface p-4 text-left transition-colors duration-[var(--duration-ui)] hover:border-border-strong active:translate-y-[1px] cursor-pointer disabled:pointer-events-none",
+                              exhausted && "opacity-40",
+                              isLockedOut && "opacity-50",
                             )}
                           >
                             <div className="flex w-full items-center justify-between gap-2">
                               <div className="flex items-baseline gap-2.5">
-                                <span className="font-mono text-[11px] text-dim">
-                                  {card.gear}
+                                <span className="font-mono text-[11px] text-muted tabular-nums">
+                                  {card.index}
                                 </span>
-                                <span className="font-sans text-lg font-semibold tracking-tight text-foreground">
+                                <span className="font-sans text-base font-medium tracking-tight text-foreground">
                                   {card.title}
                                 </span>
                               </div>
@@ -795,9 +759,11 @@ export default function PlayerPage() {
                             </div>
 
                             <div className="mt-3 flex w-full items-end justify-between gap-3">
-                              <p className="text-xs text-muted">{card.subtitle}</p>
+                              <p className="text-xs text-secondary">
+                                {card.subtitle}
+                              </p>
                               <span className="shrink-0 font-mono text-[11px] text-muted tabular-nums">
-                                {exhausted ? "depleted" : `${card.remaining} left`}
+                                {exhausted ? "0 left" : `${card.remaining} left`}
                               </span>
                             </div>
                           </button>
@@ -812,29 +778,31 @@ export default function PlayerPage() {
         ) : (
           /* 5. FINISHED STATE */
           <div className="my-auto">
-            <Panel
-              index="04"
-              label="session / classification"
-              rightSlot={<Chip tone="accent">checkered flag</Chip>}
-            >
-              <div className="p-6 text-center space-y-5">
-                <div className="mx-auto flex size-10 items-center justify-center rounded-[var(--radius-sm)] border border-accent/40 bg-accent-subtle text-accent">
+            <Card>
+              <CardHeader>
+                <Label index="race">finished</Label>
+                <Chip tone={view.player.rank === 1 ? "signal" : "neutral"}>
+                  rank #{view.player.rank}
+                </Chip>
+              </CardHeader>
+              <CardBody className="space-y-6 text-center">
+                <div className="mx-auto flex size-10 items-center justify-center rounded-[var(--radius-default)] border border-border bg-elevated text-foreground">
                   <Trophy className="size-5" />
                 </div>
 
                 <div>
-                  <p className="font-mono text-[11px] lowercase text-muted">
-                    final standing
+                  <p className="font-mono text-xs text-secondary">
+                    final position
                   </p>
-                  <h1 className="mt-0.5 font-mono text-4xl font-semibold tracking-tight text-foreground tabular-nums">
+                  <h1 className="mt-1 font-mono text-4xl font-medium tracking-tight text-foreground tabular-nums">
                     P{view.player.rank}
                   </h1>
-                  <p className="mt-1 font-sans text-sm text-muted">
+                  <p className="mt-1 font-sans text-sm text-secondary">
                     {view.player.nickname}
                   </p>
                 </div>
 
-                <div className="flex justify-center py-2">
+                <div className="flex justify-center">
                   <RaceCarSvg
                     color={view.player.carColor}
                     carNumber={view.player.carNumber}
@@ -842,24 +810,24 @@ export default function PlayerPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-left">
+                <div className="grid grid-cols-3 gap-2.5 text-left">
                   <Stat
                     label="steps"
                     value={view.player.totalSteps}
-                    tone="accent"
+                    tone={view.player.rank === 1 ? "signal" : "default"}
                   />
                   <Stat
                     label="correct"
                     value={view.player.correctCount}
-                    tone="ok"
+                    tone="success"
                   />
                   <Stat
-                    label="burned"
+                    label="skipped"
                     value={view.player.abandonedCount}
                   />
                 </div>
-              </div>
-            </Panel>
+              </CardBody>
+            </Card>
           </div>
         )}
       </main>

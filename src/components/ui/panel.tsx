@@ -8,9 +8,6 @@ export interface PanelProps extends React.HTMLAttributes<HTMLElement> {
   rightSlot?: React.ReactNode;
 }
 
-/**
- * Architectural 1px-bordered instrument panel with optional top telemetry bar.
- */
 export function Panel({
   index,
   label,
@@ -22,13 +19,13 @@ export function Panel({
   return (
     <section
       className={cn(
-        "rounded-[var(--radius-md)] border border-border bg-surface text-foreground overflow-hidden",
+        "rounded-[var(--radius-default)] border border-border bg-surface text-foreground overflow-hidden",
         className,
       )}
       {...props}
     >
       {(label || rightSlot) && (
-        <div className="flex items-center justify-between gap-3 border-b border-border bg-subtle px-4 py-2.5">
+        <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-3">
           {label ? <Label index={index}>{label}</Label> : <span />}
           {rightSlot && <div className="flex items-center gap-2">{rightSlot}</div>}
         </div>

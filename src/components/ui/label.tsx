@@ -3,13 +3,13 @@ import { cn } from "@/lib/cn";
 
 export interface LabelProps extends React.HTMLAttributes<HTMLSpanElement> {
   index?: string;
-  tone?: "default" | "accent" | "ok" | "danger";
+  tone?: "default" | "brand" | "signal" | "success" | "danger";
   dot?: boolean;
 }
 
 /**
- * Duckurity-inspired lowercase monospace micro-label with slash index,
- * e.g. <Label index="01">surface / driver</Label> -> "01 / surface / driver"
+ * Small lowercase monospace micro-label with optional slash index or live dot:
+ * e.g. <Label index="surface">01</Label> or <Label dot tone="signal">timing / live</Label>
  */
 export function Label({
   index,
@@ -22,10 +22,11 @@ export function Label({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 font-mono text-[11px] lowercase tracking-[0.04em] tabular-nums select-none",
-        tone === "default" && "text-muted",
-        tone === "accent" && "text-accent",
-        tone === "ok" && "text-ok",
+        "inline-flex items-center gap-1.5 font-mono text-[11px] leading-4 lowercase tracking-[0.04em] tabular-nums select-none",
+        tone === "default" && "text-secondary",
+        tone === "brand" && "text-brand-light",
+        tone === "signal" && "text-signal",
+        tone === "success" && "text-success",
         tone === "danger" && "text-danger",
         className,
       )}
@@ -35,17 +36,18 @@ export function Label({
         <span
           className={cn(
             "size-1.5 rounded-full",
-            tone === "default" && "bg-muted",
-            tone === "accent" && "bg-accent",
-            tone === "ok" && "bg-ok",
+            tone === "default" && "bg-secondary",
+            tone === "brand" && "bg-brand-light",
+            tone === "signal" && "bg-signal",
+            tone === "success" && "bg-success",
             tone === "danger" && "bg-danger",
           )}
         />
       )}
       {index && (
         <>
-          <span className="text-dim">{index}</span>
-          <span className="text-dim">/</span>
+          <span className="text-muted">{index}</span>
+          <span className="text-muted">/</span>
         </>
       )}
       <span>{children}</span>

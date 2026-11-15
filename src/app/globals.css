@@ -5,88 +5,76 @@
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --color-background: var(--bg);
-  --color-foreground: var(--fg);
-  --color-surface: var(--surface);
-  --color-elevated: var(--surface-elevated);
-  --color-subtle: var(--surface-subtle);
-  --color-muted: var(--fg-muted);
-  --color-dim: var(--fg-subtle);
-  --color-border: var(--border-hairline);
+  --color-surface: var(--surface-1);
+  --color-elevated: var(--surface-2);
+  --color-foreground: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-muted: var(--text-muted);
+  --color-border: var(--border);
   --color-border-strong: var(--border-strong);
-  --color-accent: var(--accent);
-  --color-accent-fg: var(--accent-fg);
-  --color-accent-subtle: var(--accent-subtle);
-  --color-ok: var(--semantic-ok);
-  --color-ok-subtle: var(--semantic-ok-subtle);
-  --color-danger: var(--semantic-danger);
-  --color-danger-subtle: var(--semantic-danger-subtle);
 
-  --radius-xs: 2px;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  --color-brand: var(--brand);
+  --color-brand-light: var(--brand-light);
+  --color-brand-subtle: var(--brand-subtle);
+
+  --color-signal: var(--signal);
+  --color-signal-subtle: var(--signal-subtle);
+
+  --color-success: var(--success);
+  --color-success-subtle: var(--success-subtle);
+
+  --color-danger: var(--danger);
+  --color-danger-subtle: var(--danger-subtle);
+
+  --radius-default: var(--radius);
 }
 
-/* Default: Pit Wall Carbon (Dark) */
-:root,
-html.dark {
+:root {
+  /* Dark-only Linear / Vercel surface hierarchy */
   --bg: #0A0B0D;
-  --surface: #101216;
-  --surface-elevated: #161920;
-  --surface-subtle: #0D0F13;
-  --fg: #F3F2EE;
-  --fg-muted: #8E939E;
-  --fg-subtle: #5A606B;
-  --border-hairline: rgba(243, 242, 238, 0.09);
-  --border-strong: rgba(243, 242, 238, 0.20);
+  --surface-1: #111317;
+  --surface-2: #171A1F;
 
-  /* Single Primary Accent: Signal Telemetry Amber */
-  --accent: #F5A623;
-  --accent-fg: #0A0B0D;
-  --accent-subtle: rgba(245, 166, 35, 0.12);
+  /* Hairline 1px borders (~8% and ~15% white) */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.15);
 
-  /* Semantic Status: Track Green & Pit Red */
-  --semantic-ok: #10B981;
-  --semantic-ok-subtle: rgba(16, 185, 129, 0.12);
-  --semantic-danger: #EF4444;
-  --semantic-danger-subtle: rgba(239, 68, 68, 0.12);
+  /* Text hierarchy (never pure #fff on #000) */
+  --text-primary: #EDEDEF;
+  --text-secondary: #8A8F98;
+  --text-muted: #5C616B;
 
-  /* Motion & Easing Tokens */
-  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-  --duration-fast: 120ms;
-  --duration-base: 200ms;
-}
+  /* Brand accent: IEEE Blue */
+  --brand: #00629B;
+  --brand-light: #3B8FD0;
+  --brand-subtle: rgba(59, 143, 208, 0.12);
 
-/* Light Mode: FIA Technical Timing Sheet */
-html.light {
-  --bg: #F6F5F0;
-  --surface: #FFFFFF;
-  --surface-elevated: #EFECE6;
-  --surface-subtle: #F0EEE8;
-  --fg: #111317;
-  --fg-muted: #575C66;
-  --fg-subtle: #858B96;
-  --border-hairline: rgba(17, 19, 23, 0.11);
-  --border-strong: rgba(17, 19, 23, 0.24);
+  /* Racing signal accent: Red-Orange (used ONLY for live dot, <10s, Hard, P1 leader, +3 pop) */
+  --signal: #FF4D2E;
+  --signal-subtle: rgba(255, 77, 46, 0.12);
 
-  --accent: #D97706;
-  --accent-fg: #FFFFFF;
-  --accent-subtle: rgba(217, 119, 6, 0.10);
+  /* Semantic status */
+  --success: #10B981;
+  --success-subtle: rgba(16, 185, 129, 0.12);
+  --danger: #E5484D;
+  --danger-subtle: rgba(229, 72, 77, 0.12);
 
-  --semantic-ok: #059669;
-  --semantic-ok-subtle: rgba(5, 150, 105, 0.10);
-  --semantic-danger: #DC2626;
-  --semantic-danger-subtle: rgba(220, 38, 38, 0.10);
+  /* Single uniform 8px radius */
+  --radius: 8px;
+
+  /* Motion tokens (150-250ms ease-out) */
+  --duration-ui: 180ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @layer base {
   * {
-    border-color: var(--border-hairline);
+    border-color: var(--border);
   }
 
   body {
     background-color: var(--bg);
-    color: var(--fg);
+    color: var(--text-primary);
     font-family: var(--font-sans);
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
@@ -94,7 +82,6 @@ html.light {
     overflow-x: hidden;
   }
 
-  /* Tabular numerals for all mono & telemetry figures */
   .font-mono,
   .tabular-nums,
   time,
@@ -103,75 +90,34 @@ html.light {
   }
 }
 
-/* Precision engineering grid & hatch patterns */
-.telemetry-grid {
-  background-size: 32px 32px;
-  background-image:
-    linear-gradient(to right, var(--border-hairline) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--border-hairline) 1px, transparent 1px);
-}
-
-.hatch-stripe {
-  background-image: repeating-linear-gradient(
-    -45deg,
-    var(--border-hairline),
-    var(--border-hairline) 1px,
-    transparent 1px,
-    transparent 7px
-  );
-}
-
-.kerb-stripe {
-  background-image: repeating-linear-gradient(
-    90deg,
-    var(--accent) 0px,
-    var(--accent) 16px,
-    var(--surface-elevated) 16px,
-    var(--surface-elevated) 32px
-  );
-}
-
-.checkered-stripe {
-  background-image: conic-gradient(
-    var(--bg) 90deg,
-    var(--fg) 90deg 180deg,
-    var(--bg) 180deg 270deg,
-    var(--fg) 270deg
-  );
-  background-size: 20px 20px;
-}
-
-/* Floating +1/+2/+3 gain indicator keyframes for Display (GPU transform & opacity only) */
+/* Floating +1/+2/+3 gain indicator on /display (GPU transform & opacity only) */
 @keyframes floatStepPop {
   0% {
     opacity: 0;
-    transform: translate3d(0, 6px, 0) scale(0.88);
+    transform: translate3d(0, 4px, 0);
   }
-  16% {
+  15% {
     opacity: 1;
-    transform: translate3d(0, -6px, 0) scale(1);
+    transform: translate3d(0, -6px, 0);
   }
   82% {
     opacity: 1;
-    transform: translate3d(0, -22px, 0) scale(1);
+    transform: translate3d(0, -20px, 0);
   }
   100% {
     opacity: 0;
-    transform: translate3d(0, -30px, 0) scale(0.96);
+    transform: translate3d(0, -26px, 0);
   }
 }
 
 .animate-step-pop {
-  animation: floatStepPop 1100ms var(--ease-out-expo) forwards;
+  animation: floatStepPop 1000ms var(--ease-out) forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
-  *::after,
-  .respect-reduced-motion *,
-  .respect-reduced-motion *::before,
-  .respect-reduced-motion *::after {
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
