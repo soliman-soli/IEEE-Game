@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
+  --font-orbitron: var(--font-orbitron), sans-serif;
+
+  --color-background: var(--bg-asphalt);
+  --color-foreground: var(--text-primary);
+  --color-surface: var(--bg-surface);
+  --color-elevated: var(--bg-elevated);
+  --color-muted: var(--text-muted);
+  --color-border: var(--border-subtle);
+  --color-brand: var(--brand-ieee);
+  --color-brand-light: var(--brand-ieee-light);
+  --color-racing-yellow: var(--accent-yellow);
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+}
+
+:root {
+  --bg-asphalt: #17191D;
+  --bg-surface: #1F2329;
+  --bg-elevated: #282D35;
+  --text-primary: #F5F3ED;
+  --text-muted: #A0A6B2;
+  --border-subtle: #2E3440;
+  --brand-ieee: #00629B;
+  --brand-ieee-light: #3898EC;
+  --accent-yellow: #FFD43B;
+}
+
+@layer base {
+  * {
+    border-color: var(--border-subtle);
+  }
+
+  body {
+    background-color: var(--bg-asphalt);
+    color: var(--text-primary);
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+}
+
+/* Diagonal hatch pattern re-implemented from Phase 0 reference (#5) */
+.hatch-stripe {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(245, 243, 237, 0.08),
+    rgba(245, 243, 237, 0.08) 2px,
+    transparent 2px,
+    transparent 8px
+  );
+}
+
+.kerb-stripe {
+  background-image: repeating-linear-gradient(
+    90deg,
+    #00629B 0px,
+    #00629B 20px,
+    #F5F3ED 20px,
+    #F5F3ED 40px
+  );
+}
+
+.checkered-stripe {
+  background-image: conic-gradient(
+    #17191D 90deg,
+    #F5F3ED 90deg 180deg,
+    #17191D 180deg 270deg,
+    #F5F3ED 270deg
+  );
+  background-size: 24px 24px;
+}
+
+/* Floating +1/+2/+3 gain indicator keyframes for Display (GPU transform & opacity only) */
+@keyframes floatStepPop {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0) scale(0.85);
+  }
+  18% {
+    opacity: 1;
+    transform: translate3d(0, -6px, 0) scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: translate3d(0, -22px, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, -30px, 0) scale(0.95);
+  }
+}
+
+.animate-step-pop {
+  animation: floatStepPop 1100ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .respect-reduced-motion *,
+  .respect-reduced-motion *::before,
+  .respect-reduced-motion *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
