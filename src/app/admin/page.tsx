@@ -9,6 +9,7 @@ import {
   Flag,
   Lock,
   LogOut,
+  Maximize2,
   Play,
   Plus,
   RotateCcw,
@@ -19,6 +20,7 @@ import {
   Upload,
   Users,
   FileQuestion,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CodeBlock } from "@/components/ui/code-block";
@@ -96,6 +98,7 @@ export default function AdminPortalPage() {
   const [qCorrect, setQCorrect] = useState<0 | 1 | 2 | 3>(0);
 
   const [joinUrl, setJoinUrl] = useState("http://localhost:3000/play");
+  const [showLargeQr, setShowLargeQr] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -968,17 +971,32 @@ export default function AdminPortalPage() {
                 {/* Right Column: Configuration Preview & QR */}
                 <div className="space-y-4">
                   <div className="rounded-[8px] border border-[#2E3440] bg-[#1F2329] p-5 space-y-4">
-                    <h3 className="font-[family-name:var(--font-orbitron)] text-sm font-bold text-[#F5F3ED]">
-                      JOIN QR & SUMMARY
-                    </h3>
-                    <div className="mx-auto flex w-fit overflow-hidden rounded-[6px] border-2 border-[#F5F3ED] bg-[#F5F3ED] p-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="font-[family-name:var(--font-orbitron)] text-sm font-bold text-[#F5F3ED]">
+                        JOIN QR & SUMMARY
+                      </h3>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setShowLargeQr(true)}
+                      >
+                        <Maximize2 className="size-3.5 text-[#FFD43B]" />
+                        <span>Enlarge QR</span>
+                      </Button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowLargeQr(true)}
+                      title="Click to enlarge QR code"
+                      className="mx-auto flex w-fit overflow-hidden rounded-[6px] border-2 border-[#F5F3ED] bg-[#F5F3ED] p-1.5 transition-transform active:scale-95 cursor-pointer"
+                    >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={`/api/qr?url=${encodeURIComponent(joinUrl)}`}
                         alt="Join QR"
                         className="size-36 block"
                       />
-                    </div>
+                    </button>
                     <p className="text-center font-mono text-xs text-[#3898EC] break-all">
                       {joinUrl}
                     </p>
@@ -1459,6 +1477,69 @@ export default function AdminPortalPage() {
               </Button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Enlarged Fullscreen QR Code Modal */}
+      {showLargeQr && (
+        <div
+          onClick={() => setShowLargeQr(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-2xl rounded-[8px] border-2 border-[#00629B] bg-[#1F2329] p-6 text-center space-y-5"
+          >
+            <div className="flex items-center justify-between border-b border-[#2E3440] pb-3">
+              <div className="text-left">
+                <span className="inline-block rounded-[4px] bg-[#00629B] px-2.5 py-0.5 font-[family-name:var(--font-orbitron)] text-xs font-bold text-[#F5F3ED]">
+                  SCAN TO JOIN RACE
+                </span>
+                <h3 className="mt-1 font-[family-name:var(--font-orbitron)] text-lg font-bold text-[#F5F3ED]">
+                  {race.name} • {players.length} Racers Joined
+                </h3>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowLargeQr(false)}
+              >
+                <X className="size-4" />
+                <span>Close</span>
+              </Button>
+            </div>
+
+            <div className="mx-auto flex w-fit overflow-hidden rounded-[8px] border-4 border-[#F5F3ED] bg-[#F5F3ED] p-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/api/qr?url=${encodeURIComponent(joinUrl)}`}
+                alt="Large Join QR"
+                className="size-72 sm:size-96 md:size-[420px] block"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <p className="font-[family-name:var(--font-orbitron)] text-xl sm:text-2xl font-bold text-[#3898EC] break-all">
+                {joinUrl}
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                <CopyButton value={joinUrl} label="Copy join link" />
+                {isLobby && (
+                  <Button
+                    disabled={busy}
+                    onClick={() => {
+                      setShowLargeQr(false);
+                      void runRaceAction("start");
+                    }}
+                    className="bg-[#22C55E] text-[#17191D] border-[#16A34A] font-[family-name:var(--font-orbitron)] font-black px-6"
+                  >
+                    <Play className="size-4 fill-current" />
+                    <span>Start race now ({players.length} racers)</span>
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

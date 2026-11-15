@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Flag, Maximize2, Trophy, Users, Volume2, VolumeX } from "lucide-react";
+import { Flag, Maximize2, QrCode, Trophy, Users, Volume2, VolumeX, X } from "lucide-react";
 import { RaceCarSvg } from "@/components/ui/race-car-svg";
 import { raceAudio } from "@/lib/audio";
 import {
@@ -25,6 +25,7 @@ export default function LiveRaceDisplayPage() {
   const [snapshot, setSnapshot] = useState<RacePublicSnapshot | null>(null);
   const [muted, setMuted] = useState(false);
   const [joinUrl, setJoinUrl] = useState("http://localhost:3000/play");
+  const [showLargeQr, setShowLargeQr] = useState(false);
   const [stepPops, setStepPops] = useState<Record<string, StepPopItem>>({});
 
   const seenEventsRef = useRef<Map<string, string>>(new Map());
@@ -458,20 +459,35 @@ export default function LiveRaceDisplayPage() {
 
           {/* LOBBY QR JOIN OVERLAY */}
           {effectiveStatus === "LOBBY" && (
-            <div className="pointer-events-none absolute inset-x-8 bottom-8 z-20 flex items-center justify-between rounded-[8px] border-2 border-[#00629B] bg-[#1F2329]/95 p-5">
+            <div className="absolute inset-x-8 bottom-8 z-20 flex items-center justify-between rounded-[8px] border-2 border-[#00629B] bg-[#1F2329]/95 p-5">
               <div className="flex items-center gap-5">
-                <div className="overflow-hidden rounded-[6px] border-2 border-[#F5F3ED] bg-[#F5F3ED] p-1">
+                <button
+                  type="button"
+                  onClick={() => setShowLargeQr(true)}
+                  title="Click to enlarge QR code"
+                  className="overflow-hidden rounded-[6px] border-2 border-[#F5F3ED] bg-[#F5F3ED] p-1 transition-transform active:scale-95 cursor-pointer"
+                >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={`/api/qr?url=${encodeURIComponent(joinUrl)}`}
                     alt="Scan to join race"
                     className="size-32 block"
                   />
-                </div>
+                </button>
                 <div className="space-y-1.5">
-                  <span className="inline-block rounded-[4px] bg-[#00629B] px-2.5 py-0.5 font-[family-name:var(--font-orbitron)] text-xs font-bold text-[#F5F3ED]">
-                    SCAN TO JOIN ON YOUR PHONE
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block rounded-[4px] bg-[#00629B] px-2.5 py-0.5 font-[family-name:var(--font-orbitron)] text-xs font-bold text-[#F5F3ED]">
+                      SCAN TO JOIN ON YOUR PHONE
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowLargeQr(true)}
+                      className="inline-flex items-center gap-1.5 rounded-[4px] border border-[#2E3440] bg-[#282D35] px-2.5 py-0.5 text-xs font-semibold text-[#FFD43B] cursor-pointer"
+                    >
+                      <QrCode className="size-3.5" />
+                      <span>Enlarge QR</span>
+                    </button>
+                  </div>
                   <h2 className="font-[family-name:var(--font-orbitron)] text-2xl font-black text-[#F5F3ED]">
                     {joinUrl}
                   </h2>
@@ -489,6 +505,49 @@ export default function LiveRaceDisplayPage() {
                   {players.length}
                 </span>
                 <span className="block text-xs text-[#A0A6B2]">Cars on track</span>
+              </div>
+            </div>
+          )}
+
+          {/* FULLSCREEN LARGE QR OVERLAY IN LOBBY */}
+          {effectiveStatus === "LOBBY" && showLargeQr && (
+            <div
+              onClick={() => setShowLargeQr(false)}
+              className="absolute inset-0 z-40 flex items-center justify-center bg-[#17191D]/92 p-8"
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="flex max-w-3xl flex-col items-center rounded-[8px] border-2 border-[#00629B] bg-[#1F2329] px-12 py-8 text-center space-y-5"
+              >
+                <div className="flex w-full items-center justify-between gap-8 border-b border-[#2E3440] pb-4">
+                  <span className="rounded-[4px] bg-[#00629B] px-3 py-1 font-[family-name:var(--font-orbitron)] text-sm font-bold text-[#F5F3ED]">
+                    SCAN TO JOIN THE GRID
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowLargeQr(false)}
+                    className="inline-flex items-center gap-1.5 rounded-[6px] border border-[#2E3440] bg-[#282D35] px-3 py-1.5 text-xs font-semibold text-[#F5F3ED] cursor-pointer"
+                  >
+                    <X className="size-4" />
+                    <span>Minimize QR</span>
+                  </button>
+                </div>
+
+                <div className="overflow-hidden rounded-[8px] border-4 border-[#F5F3ED] bg-[#F5F3ED] p-4">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`/api/qr?url=${encodeURIComponent(joinUrl)}`}
+                    alt="Giant Join QR"
+                    className="size-[420px] block"
+                  />
+                </div>
+
+                <h2 className="font-[family-name:var(--font-orbitron)] text-3xl font-black text-[#3898EC]">
+                  {joinUrl}
+                </h2>
+                <p className="font-[family-name:var(--font-orbitron)] text-lg font-bold text-[#FFD43B]">
+                  {players.length} Racers Ready on Starting Grid
+                </p>
               </div>
             </div>
           )}
