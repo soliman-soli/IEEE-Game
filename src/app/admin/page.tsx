@@ -3,29 +3,43 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  ArrowLeft,
   CheckCircle2,
   Download,
   ExternalLink,
-  Flag,
+  FileQuestion,
   Lock,
   LogOut,
   Maximize2,
   Play,
   Plus,
   RotateCcw,
+  Search,
   Settings,
   Square,
   Trash2,
   Trophy,
   Upload,
   Users,
-  FileQuestion,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Chip } from "@/components/ui/chip";
 import { CodeBlock } from "@/components/ui/code-block";
 import { CopyButton } from "@/components/ui/copy-button";
+import { Label } from "@/components/ui/label";
+import { Panel } from "@/components/ui/panel";
 import { RaceCarSvg } from "@/components/ui/race-car-svg";
+import { Stat } from "@/components/ui/stat";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from "@/components/ui/table";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import {
   updateOffsetFromServerIso,
   useAuthoritativeCountdown,
@@ -80,11 +94,13 @@ export default function AdminPortalPage() {
   const [cfgAllowAbandon, setCfgAllowAbandon] = useState(true);
   const [configDirty, setConfigDirty] = useState(false);
 
-  // Player rename state
+  // Player search & rename state
+  const [playerSearch, setPlayerSearch] = useState("");
   const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
   const [editingNickname, setEditingNickname] = useState("");
 
-  // Question filter & form state
+  // Question search, filter & form state
+  const [questionSearch, setQuestionSearch] = useState("");
   const [filterDiff, setFilterDiff] = useState<"ALL" | Difficulty>("ALL");
   const [filterCat, setFilterCat] = useState<string>("ALL");
   const [showQuestionModal, setShowQuestionModal] = useState(false);
@@ -224,14 +240,14 @@ export default function AdminPortalPage() {
       syncFormFromRace((payload as AdminPayload).race);
       setActionMsg(
         action === "start"
-          ? "Race countdown initiated!"
+          ? "Launch sequence initiated across all surfaces."
           : action === "end"
-            ? "Race ended and standings locked."
+            ? "Session terminated and classification locked."
             : action === "reset"
-              ? "Race reset to Lobby."
+              ? "Session reset to starting grid."
               : action === "new-round"
-                ? "New round created with fresh question pool."
-                : "Configuration saved.",
+                ? "New round initialized with fresh question pool."
+                : "Session calibration saved.",
       );
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Operation failed.");
@@ -415,53 +431,68 @@ export default function AdminPortalPage() {
   // LOGIN SCREEN
   if (authed === false) {
     return (
-      <main className="respect-reduced-motion flex min-h-screen items-center justify-center bg-[#17191D] px-4">
-        <div className="w-full max-w-md rounded-[8px] border border-[#2E3440] bg-[#1F2329] p-6">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-[6px] bg-[#00629B] text-[#F5F3ED]">
-              <Lock className="size-5" />
-            </div>
-            <div>
-              <h1 className="font-[family-name:var(--font-orbitron)] text-lg font-bold text-[#F5F3ED]">
-                RACE CONTROL LOGIN
-              </h1>
-              <p className="text-xs text-[#A0A6B2]">
-                IEEE Grand Prix Organizer Portal
-              </p>
-            </div>
+      <main className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="w-full max-w-md space-y-4">
+          <div className="flex items-center justify-between">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 font-mono text-xs text-muted hover:text-foreground"
+            >
+              <ArrowLeft className="size-3.5" />
+              <span>surfaces</span>
+            </Link>
+            <ThemeToggle />
           </div>
 
-          {loginError && (
-            <div className="mt-4 rounded-[6px] border border-[#EF4444] bg-[#EF4444]/15 p-3 text-xs text-[#EF4444]">
-              {loginError}
-            </div>
-          )}
+          <Panel
+            index="03"
+            label="security / race control auth"
+            rightSlot={<Lock className="size-3.5 text-accent" />}
+          >
+            <div className="p-6 space-y-5">
+              <div>
+                <h1 className="font-sans text-2xl font-semibold tracking-[-0.025em] text-foreground">
+                  Race Director Console
+                </h1>
+                <p className="mt-1 text-xs text-muted">
+                  Authenticate to manage session duration, driver grid, and the
+                  90-question bank.
+                </p>
+              </div>
 
-          <form onSubmit={handleLogin} className="mt-5 space-y-4">
-            <div>
-              <label
-                htmlFor="admin-password"
-                className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#A0A6B2]"
-              >
-                Organizer Password
-              </label>
-              <input
-                id="admin-password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter ADMIN_PASSWORD..."
-                className="h-11 w-full rounded-[6px] border border-[#2E3440] bg-[#17191D] px-3.5 text-sm text-[#F5F3ED] focus:border-[#3898EC] focus:outline-none"
-              />
-              <p className="mt-1.5 font-mono text-[11px] text-[#A0A6B2]">
-                Default password: <code>ieee-race-2026</code>
-              </p>
+              {loginError && (
+                <div className="rounded-[var(--radius-sm)] border border-danger bg-danger-subtle p-3 font-mono text-xs text-danger">
+                  {loginError}
+                </div>
+              )}
+
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label
+                    htmlFor="admin-password"
+                    className="mb-1.5 block font-mono text-[11px] lowercase tracking-[0.04em] text-muted"
+                  >
+                    director key (ADMIN_PASSWORD)
+                  </label>
+                  <input
+                    id="admin-password"
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter director password..."
+                    className="h-10 w-full rounded-[var(--radius-sm)] border border-border bg-subtle px-3 font-mono text-xs text-foreground focus:border-accent focus:outline-none"
+                  />
+                  <p className="mt-1.5 font-mono text-[11px] text-dim">
+                    default key: <code>ieee-race-2026</code>
+                  </p>
+                </div>
+                <Button type="submit" size="lg" disabled={busy} className="w-full">
+                  {busy ? "Verifying key..." : "Unlock race control"}
+                </Button>
+              </form>
             </div>
-            <Button type="submit" disabled={busy} className="w-full">
-              {busy ? "Signing in..." : "Sign in to race control"}
-            </Button>
-          </form>
+          </Panel>
         </div>
       </main>
     );
@@ -469,8 +500,9 @@ export default function AdminPortalPage() {
 
   if (!data) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#17191D] text-sm font-mono text-[#A0A6B2]">
-        Loading Race Control Portal...
+      <div className="flex min-h-screen items-center justify-center bg-background font-mono text-xs text-muted">
+        <span className="mr-2 size-2 rounded-full bg-accent animate-pulse" />
+        <span>telemetry / loading race control console...</span>
       </div>
     );
   }
@@ -478,41 +510,61 @@ export default function AdminPortalPage() {
   const { race, players, questions, enabledCounts, history } = data;
   const isLobby = race.status === "LOBBY";
 
+  const filteredPlayers = players.filter((p) =>
+    playerSearch.trim()
+      ? p.nickname.toLowerCase().includes(playerSearch.trim().toLowerCase()) ||
+        String(p.carNumber).includes(playerSearch.trim())
+      : true,
+  );
+
   const filteredQuestions = questions.filter((q) => {
     if (filterDiff !== "ALL" && q.difficulty !== filterDiff) return false;
     if (filterCat !== "ALL" && q.category !== filterCat) return false;
+    if (questionSearch.trim()) {
+      const needle = questionSearch.trim().toLowerCase();
+      return (
+        q.prompt.toLowerCase().includes(needle) ||
+        q.category.toLowerCase().includes(needle) ||
+        (q.codeSnippet && q.codeSnippet.toLowerCase().includes(needle))
+      );
+    }
     return true;
   });
 
   return (
-    <div className="respect-reduced-motion flex min-h-screen flex-col bg-[#17191D] text-[#F5F3ED]">
-      {/* Sticky Top Navbar (Re-implemented from Phase 0 Ref #7) */}
-      <header className="sticky top-0 z-40 border-b border-[#2E3440] bg-[#17191D]/95 px-4 py-3 md:px-8">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      {/* Sticky Top Console Bar */}
+      <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-md px-4 py-2.5 md:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-[6px] bg-[#00629B] text-[#F5F3ED]">
-              <Flag className="size-5" />
-            </div>
-            <div>
+          <div className="flex items-center gap-3 min-w-0">
+            <Link
+              href="/"
+              aria-label="Back to surfaces"
+              className="flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-border bg-surface text-muted transition-colors hover:text-foreground"
+            >
+              <ArrowLeft className="size-4" />
+            </Link>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-[family-name:var(--font-orbitron)] text-base font-bold tracking-tight">
-                  IEEE RACE CONTROL
+                <span className="font-mono text-xs font-semibold text-foreground">
+                  03 / race control
                 </span>
-                <span
-                  className={cn(
-                    "rounded-[4px] px-2 py-0.5 font-[family-name:var(--font-orbitron)] text-[11px] font-bold",
-                    race.status === "RACING" && "bg-[#22C55E] text-[#17191D]",
-                    race.status === "COUNTDOWN" && "bg-[#FFD43B] text-[#17191D]",
-                    race.status === "LOBBY" &&
-                      "border border-[#3898EC] bg-[#00629B]/25 text-[#3898EC]",
-                    race.status === "FINISHED" && "bg-[#FFD43B] text-[#17191D]",
-                  )}
+                <Chip
+                  tone={
+                    race.status === "RACING"
+                      ? "ok"
+                      : race.status === "COUNTDOWN" ||
+                          race.status === "FINISHED"
+                        ? "accent"
+                        : "neutral"
+                  }
+                  dot
                 >
-                  {race.status}
-                </span>
+                  {race.status.toLowerCase()}
+                </Chip>
               </div>
-              <p className="font-mono text-[11px] text-[#A0A6B2]">
-                {race.name} • {players.length} Racers • Clock:{" "}
+              <p className="truncate font-mono text-[11px] text-muted tabular-nums">
+                {race.name} · {players.length} drivers · clock{" "}
                 {race.status === "RACING"
                   ? formattedRaceTimer
                   : race.status === "COUNTDOWN"
@@ -523,51 +575,59 @@ export default function AdminPortalPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <CopyButton value={joinUrl} label="Copy join link" />
+            <ThemeToggle />
+            <CopyButton value={joinUrl} label="copy /play link" />
             <Link
               href="/display"
               target="_blank"
-              className="inline-flex h-9 items-center gap-1.5 rounded-[6px] border border-[#2E3440] bg-[#282D35] px-3 text-xs font-semibold text-[#F5F3ED]"
+              className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-sm)] border border-border bg-elevated px-2.5 font-mono text-xs text-foreground transition-colors hover:border-border-strong"
             >
-              <span>Open live display</span>
-              <ExternalLink className="size-3.5 text-[#FFD43B]" />
+              <span>broadcast</span>
+              <ExternalLink className="size-3 text-accent" />
             </Link>
-            <Button variant="secondary" size="sm" onClick={handleLogout}>
+            <Button variant="ghost" size="sm" onClick={handleLogout}>
               <LogOut className="size-3.5" />
-              <span>Sign out</span>
+              <span className="hidden sm:inline">lock</span>
             </Button>
           </div>
         </div>
       </header>
 
-      {/* Shell Grid: Left Rail + Hatch Divider + Main Workspace */}
-      <div className="flex-1 md:grid md:grid-cols-[220px_16px_minmax(0,1fr)]">
-        {/* Left Navigation Rail (Re-implemented from Phase 0 Ref #7) */}
-        <aside className="border-b border-[#2E3440] bg-[#1F2329]/50 p-4 md:border-b-0">
+      {/* Console Shell: Left Rail + Hairline Hatch Divider + Main Workspace */}
+      <div className="flex-1 md:grid md:grid-cols-[220px_12px_minmax(0,1fr)]">
+        {/* Left Navigation Rail */}
+        <aside className="border-b border-border bg-surface p-3 md:border-b-0">
+          <div className="mb-2 hidden px-2 md:block">
+            <Label index="nav">instruments</Label>
+          </div>
           <nav className="flex gap-1 overflow-x-auto md:flex-col">
             {(
               [
                 {
                   id: "control" as AdminTab,
-                  label: "Race & Config",
+                  index: "01",
+                  label: "session & config",
                   icon: Settings,
-                  badge: race.status,
+                  badge: race.status.toLowerCase(),
                 },
                 {
                   id: "players" as AdminTab,
-                  label: "Participants",
+                  index: "02",
+                  label: "driver grid",
                   icon: Users,
                   badge: String(players.length),
                 },
                 {
                   id: "questions" as AdminTab,
-                  label: "Question Bank",
+                  index: "03",
+                  label: "telemetry bank",
                   icon: FileQuestion,
                   badge: String(questions.length),
                 },
                 {
                   id: "results" as AdminTab,
-                  label: "Results & CSV",
+                  index: "04",
+                  label: "archive & csv",
                   icon: Trophy,
                   badge: String(history.length),
                 },
@@ -581,24 +641,22 @@ export default function AdminPortalPage() {
                   type="button"
                   onClick={() => setActiveTab(item.id)}
                   className={cn(
-                    "flex items-center justify-between gap-2 rounded-[6px] px-3 py-2.5 text-left text-xs font-semibold transition-colors cursor-pointer",
+                    "flex shrink-0 items-center justify-between gap-2 rounded-[var(--radius-sm)] border px-2.5 py-2 text-left font-mono text-xs transition-colors cursor-pointer",
                     active
-                      ? "bg-[#00629B] text-[#F5F3ED]"
-                      : "text-[#A0A6B2] hover:bg-[#282D35] hover:text-[#F5F3ED]",
+                      ? "border-accent/50 bg-accent-subtle text-foreground"
+                      : "border-transparent text-muted hover:bg-elevated hover:text-foreground",
                   )}
                 >
                   <span className="flex items-center gap-2">
-                    <Icon className="size-4 shrink-0" />
+                    <Icon
+                      className={cn(
+                        "size-3.5 shrink-0",
+                        active ? "text-accent" : "text-muted",
+                      )}
+                    />
                     <span>{item.label}</span>
                   </span>
-                  <span
-                    className={cn(
-                      "rounded-[4px] px-1.5 py-0.5 font-mono text-[10px]",
-                      active
-                        ? "bg-[#17191D]/40 text-[#F5F3ED]"
-                        : "bg-[#282D35] text-[#A0A6B2]",
-                    )}
-                  >
+                  <span className="rounded-[var(--radius-xs)] border border-border bg-subtle px-1.5 py-0.5 text-[10px] text-muted tabular-nums">
                     {item.badge}
                   </span>
                 </button>
@@ -607,62 +665,101 @@ export default function AdminPortalPage() {
           </nav>
         </aside>
 
-        {/* Diagonal Hatch Column Divider (Phase 0 Ref #5) */}
-        <div className="hatch-stripe hidden border-x border-[#2E3440] md:block" />
+        {/* Precision Hatch Divider */}
+        <div className="hatch-stripe hidden border-x border-border md:block" />
 
         {/* Main Workspace */}
-        <main className="p-4 md:p-6 space-y-6">
+        <main className="p-4 md:p-6 space-y-5 min-w-0">
           {actionMsg && (
-            <div className="flex items-center justify-between rounded-[6px] border border-[#22C55E] bg-[#22C55E]/15 px-4 py-2.5 text-xs text-[#F5F3ED]">
+            <div className="flex items-center justify-between rounded-[var(--radius-sm)] border border-ok bg-ok-subtle px-4 py-2.5 font-mono text-xs text-ok">
               <span className="flex items-center gap-2">
-                <CheckCircle2 className="size-4 text-[#22C55E]" />
-                {actionMsg}
+                <CheckCircle2 className="size-4" />
+                <span>{actionMsg}</span>
               </span>
               <button
                 type="button"
                 onClick={() => setActionMsg(null)}
-                className="font-mono text-[11px] text-[#A0A6B2]"
+                className="text-[11px] underline cursor-pointer"
               >
-                Dismiss
+                dismiss
               </button>
             </div>
           )}
 
           {errorMsg && (
-            <div className="flex items-center justify-between rounded-[6px] border border-[#EF4444] bg-[#EF4444]/15 px-4 py-2.5 text-xs text-[#EF4444]">
+            <div className="flex items-center justify-between rounded-[var(--radius-sm)] border border-danger bg-danger-subtle px-4 py-2.5 font-mono text-xs text-danger">
               <span>{errorMsg}</span>
               <button
                 type="button"
                 onClick={() => setErrorMsg(null)}
-                className="font-mono text-[11px]"
+                className="text-[11px] underline cursor-pointer"
               >
-                Dismiss
+                dismiss
               </button>
             </div>
           )}
 
-          {/* TAB 1: RACE LIFECYCLE & CONFIGURATION */}
+          {/* TAB 1: SESSION LIFECYCLE & CONFIGURATION */}
           {activeTab === "control" && (
-            <div className="space-y-6">
-              {/* Primary Lifecycle Bar */}
-              <section className="rounded-[8px] border border-[#2E3440] bg-[#1F2329] p-5">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <h2 className="font-[family-name:var(--font-orbitron)] text-lg font-bold text-[#F5F3ED]">
-                      RACE LIFECYCLE CONTROLS
+            <div className="space-y-5">
+              {/* Top Telemetry KPI Strip */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <Stat
+                  label="session status"
+                  value={race.status}
+                  sub={race.name}
+                  tone={race.status === "RACING" ? "ok" : "accent"}
+                />
+                <Stat
+                  label="registered cars"
+                  value={players.length}
+                  sub="live grid"
+                />
+                <Stat
+                  label="question pool"
+                  value={race.easyCount + race.mediumCount + race.hardCount}
+                  sub={`${race.easyCount}E · ${race.mediumCount}M · ${race.hardCount}H`}
+                />
+                <Stat
+                  label="max step ceiling"
+                  value={
+                    race.easyCount * race.easyReward +
+                    race.mediumCount * race.mediumReward +
+                    race.hardCount * race.hardReward
+                  }
+                  sub={`${race.durationSec}s window`}
+                  tone="accent"
+                />
+              </div>
+
+              {/* Primary Lifecycle Trigger Bar */}
+              <Panel
+                index="01"
+                label="session / lifecycle triggers"
+                rightSlot={
+                  <span className="font-mono text-[11px] text-muted">
+                    server-authoritative clock
+                  </span>
+                }
+              >
+                <div className="flex flex-wrap items-center justify-between gap-4 p-4">
+                  <div className="space-y-0.5">
+                    <h2 className="font-sans text-base font-semibold text-foreground">
+                      Master Start & Classification Controls
                     </h2>
-                    <p className="text-xs text-[#A0A6B2]">
-                      Starting the race locks the configuration and triggers a simultaneous 4-second countdown on all screens.
+                    <p className="text-xs text-muted">
+                      Starting locks configuration and fires a 4-second launch
+                      gantry on every driver and projector screen.
                     </p>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2.5">
                     {isLobby && (
                       <Button
-                        size="default"
+                        variant="primary"
+                        size="lg"
                         disabled={busy}
                         onClick={() => void runRaceAction("start")}
-                        className="bg-[#22C55E] text-[#17191D] border-[#16A34A] font-[family-name:var(--font-orbitron)] font-black px-6"
                       >
                         <Play className="size-4 fill-current" />
                         <span>Start race</span>
@@ -671,23 +768,23 @@ export default function AdminPortalPage() {
 
                     {(race.status === "RACING" || race.status === "COUNTDOWN") &&
                       (confirmKey === "end" ? (
-                        <div className="flex items-center gap-2 rounded-[6px] border border-[#EF4444] bg-[#17191D] p-1.5">
-                          <span className="px-2 text-xs text-[#EF4444]">
-                            Stop race now?
+                        <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-sm)] border border-danger bg-danger-subtle p-1.5 font-mono text-xs">
+                          <span className="px-2 text-danger">
+                            terminate session now?
                           </span>
                           <Button
                             variant="danger"
                             size="sm"
                             onClick={() => void runRaceAction("end")}
                           >
-                            Confirm end race
+                            confirm end
                           </Button>
                           <Button
                             variant="secondary"
                             size="sm"
                             onClick={() => setConfirmKey(null)}
                           >
-                            Cancel
+                            cancel
                           </Button>
                         </div>
                       ) : (
@@ -695,30 +792,30 @@ export default function AdminPortalPage() {
                           variant="danger"
                           onClick={() => setConfirmKey("end")}
                         >
-                          <Square className="size-4" />
+                          <Square className="size-3.5" />
                           <span>End race</span>
                         </Button>
                       ))}
 
                     {!isLobby &&
                       (confirmKey === "reset" ? (
-                        <div className="flex items-center gap-2 rounded-[6px] border border-[#FFD43B] bg-[#17191D] p-1.5">
-                          <span className="px-2 text-xs text-[#FFD43B]">
-                            Zero all scores in this round?
+                        <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-sm)] border border-accent bg-accent-subtle p-1.5 font-mono text-xs">
+                          <span className="px-2 text-accent">
+                            zero all scores in {race.name}?
                           </span>
                           <Button
                             variant="danger"
                             size="sm"
                             onClick={() => void runRaceAction("reset")}
                           >
-                            Confirm reset
+                            confirm reset
                           </Button>
                           <Button
                             variant="secondary"
                             size="sm"
                             onClick={() => setConfirmKey(null)}
                           >
-                            Cancel
+                            cancel
                           </Button>
                         </div>
                       ) : (
@@ -726,29 +823,29 @@ export default function AdminPortalPage() {
                           variant="secondary"
                           onClick={() => setConfirmKey("reset")}
                         >
-                          <RotateCcw className="size-4" />
+                          <RotateCcw className="size-3.5" />
                           <span>Reset race</span>
                         </Button>
                       ))}
 
                     {confirmKey === "new-round" ? (
-                      <div className="flex items-center gap-2 rounded-[6px] border border-[#3898EC] bg-[#17191D] p-1.5">
-                        <span className="px-2 text-xs text-[#3898EC]">
-                          Archive round & clear lobby?
+                      <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-sm)] border border-border-strong bg-elevated p-1.5 font-mono text-xs">
+                        <span className="px-2 text-foreground">
+                          archive round & clear grid?
                         </span>
                         <Button
                           variant="primary"
                           size="sm"
                           onClick={() => void runRaceAction("new-round")}
                         >
-                          Confirm new round
+                          confirm new round
                         </Button>
                         <Button
                           variant="secondary"
                           size="sm"
                           onClick={() => setConfirmKey(null)}
                         >
-                          Cancel
+                          cancel
                         </Button>
                       </div>
                     ) : (
@@ -756,252 +853,245 @@ export default function AdminPortalPage() {
                         variant="secondary"
                         onClick={() => setConfirmKey("new-round")}
                       >
-                        <Plus className="size-4" />
-                        <span>Start new round</span>
+                        <Plus className="size-3.5" />
+                        <span>New round</span>
                       </Button>
                     )}
                   </div>
                 </div>
-              </section>
+              </Panel>
 
-              {/* Pre-Race Configuration & Preview */}
-              <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-                <form
-                  onSubmit={handleSaveConfig}
-                  className="rounded-[8px] border border-[#2E3440] bg-[#1F2329] p-5 space-y-5"
+              {/* Pre-Race Configuration & Join QR */}
+              <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
+                <Panel
+                  index="02"
+                  label="calibration / pre-race parameters"
+                  rightSlot={
+                    !isLobby ? (
+                      <Chip tone="accent">
+                        <Lock className="size-3" />
+                        <span>locked</span>
+                      </Chip>
+                    ) : (
+                      <Chip tone="ok">editable in lobby</Chip>
+                    )
+                  }
                 >
-                  <div className="flex items-center justify-between border-b border-[#2E3440] pb-3">
-                    <div>
-                      <h3 className="font-[family-name:var(--font-orbitron)] text-sm font-bold text-[#F5F3ED]">
-                        PRE-RACE CONFIGURATION
-                      </h3>
-                      <p className="text-xs text-[#A0A6B2]">
-                        {isLobby
-                          ? "Customize race parameters before pressing Start race."
-                          : "Configuration is locked while the race is active or finished."}
-                      </p>
+                  <form onSubmit={handleSaveConfig} className="p-4 space-y-5">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-1.5 block font-mono text-[11px] lowercase text-muted">
+                          session identifier
+                        </label>
+                        <input
+                          type="text"
+                          disabled={!isLobby}
+                          value={cfgName}
+                          onChange={(e) => {
+                            setCfgName(e.target.value);
+                            setConfigDirty(true);
+                          }}
+                          className="h-9 w-full rounded-[var(--radius-sm)] border border-border bg-subtle px-3 text-xs text-foreground focus:border-accent focus:outline-none disabled:opacity-50"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block font-mono text-[11px] lowercase text-muted">
+                          duration (seconds, default 180)
+                        </label>
+                        <input
+                          type="number"
+                          min={30}
+                          max={1800}
+                          disabled={!isLobby}
+                          value={cfgDuration}
+                          onChange={(e) => {
+                            setCfgDuration(Number(e.target.value));
+                            setConfigDirty(true);
+                          }}
+                          className="h-9 w-full rounded-[var(--radius-sm)] border border-border bg-subtle px-3 font-mono text-xs text-foreground tabular-nums focus:border-accent focus:outline-none disabled:opacity-50"
+                        />
+                      </div>
                     </div>
-                    {!isLobby && (
-                      <span className="inline-flex items-center gap-1 rounded-[4px] bg-[#282D35] px-2.5 py-1 font-mono text-xs text-[#FFD43B]">
-                        <Lock className="size-3.5" /> LOCKED
-                      </span>
+
+                    {/* Question Pool Allocation */}
+                    <div className="space-y-2">
+                      <Label>
+                        pool allocation (total:{" "}
+                        {cfgEasyCount + cfgMediumCount + cfgHardCount} questions)
+                      </Label>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-[var(--radius-sm)] border border-border bg-subtle p-3">
+                          <label className="block font-mono text-[11px] text-ok">
+                            easy ({enabledCounts.EASY} avail)
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={enabledCounts.EASY}
+                            disabled={!isLobby}
+                            value={cfgEasyCount}
+                            onChange={(e) => {
+                              setCfgEasyCount(Number(e.target.value));
+                              setConfigDirty(true);
+                            }}
+                            className="mt-1.5 h-8 w-full rounded-[var(--radius-xs)] border border-border bg-surface px-2.5 font-mono text-xs text-foreground tabular-nums"
+                          />
+                        </div>
+
+                        <div className="rounded-[var(--radius-sm)] border border-border bg-subtle p-3">
+                          <label className="block font-mono text-[11px] text-foreground">
+                            medium ({enabledCounts.MEDIUM} avail)
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={enabledCounts.MEDIUM}
+                            disabled={!isLobby}
+                            value={cfgMediumCount}
+                            onChange={(e) => {
+                              setCfgMediumCount(Number(e.target.value));
+                              setConfigDirty(true);
+                            }}
+                            className="mt-1.5 h-8 w-full rounded-[var(--radius-xs)] border border-border bg-surface px-2.5 font-mono text-xs text-foreground tabular-nums"
+                          />
+                        </div>
+
+                        <div className="rounded-[var(--radius-sm)] border border-border bg-subtle p-3">
+                          <label className="block font-mono text-[11px] text-accent">
+                            hard ({enabledCounts.HARD} avail)
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={enabledCounts.HARD}
+                            disabled={!isLobby}
+                            value={cfgHardCount}
+                            onChange={(e) => {
+                              setCfgHardCount(Number(e.target.value));
+                              setConfigDirty(true);
+                            }}
+                            className="mt-1.5 h-8 w-full rounded-[var(--radius-xs)] border border-border bg-surface px-2.5 font-mono text-xs text-foreground tabular-nums"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Step Rewards */}
+                    <div className="space-y-2">
+                      <Label>gear step deltas</Label>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <div>
+                          <label className="mb-1 block font-mono text-[11px] text-ok">
+                            easy delta
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={10}
+                            disabled={!isLobby}
+                            value={cfgEasyReward}
+                            onChange={(e) => {
+                              setCfgEasyReward(Number(e.target.value));
+                              setConfigDirty(true);
+                            }}
+                            className="h-8 w-full rounded-[var(--radius-xs)] border border-border bg-subtle px-2.5 font-mono text-xs text-foreground tabular-nums"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block font-mono text-[11px] text-foreground">
+                            medium delta
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={10}
+                            disabled={!isLobby}
+                            value={cfgMediumReward}
+                            onChange={(e) => {
+                              setCfgMediumReward(Number(e.target.value));
+                              setConfigDirty(true);
+                            }}
+                            className="h-8 w-full rounded-[var(--radius-xs)] border border-border bg-subtle px-2.5 font-mono text-xs text-foreground tabular-nums"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block font-mono text-[11px] text-accent">
+                            hard delta
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={10}
+                            disabled={!isLobby}
+                            value={cfgHardReward}
+                            onChange={(e) => {
+                              setCfgHardReward(Number(e.target.value));
+                              setConfigDirty(true);
+                            }}
+                            className="h-8 w-full rounded-[var(--radius-xs)] border border-border bg-subtle px-2.5 font-mono text-xs text-foreground tabular-nums"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Abandon Toggle */}
+                    <div className="flex items-center justify-between rounded-[var(--radius-sm)] border border-border bg-subtle p-3">
+                      <div className="pr-3">
+                        <p className="text-xs font-medium text-foreground">
+                          Permit strategic question abandonment
+                        </p>
+                        <p className="text-[11px] text-muted">
+                          Abandoned questions grant 0 steps, never reveal the
+                          solution, and burn that question for the driver.
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        disabled={!isLobby}
+                        checked={cfgAllowAbandon}
+                        onChange={(e) => {
+                          setCfgAllowAbandon(e.target.checked);
+                          setConfigDirty(true);
+                        }}
+                        className="size-4 accent-[var(--accent)]"
+                      />
+                    </div>
+
+                    {isLobby && (
+                      <div className="flex justify-end">
+                        <Button
+                          type="submit"
+                          disabled={busy || !configDirty}
+                        >
+                          Save calibration
+                        </Button>
+                      </div>
                     )}
-                  </div>
+                  </form>
+                </Panel>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold text-[#A0A6B2]">
-                        Round Name
-                      </label>
-                      <input
-                        type="text"
-                        disabled={!isLobby}
-                        value={cfgName}
-                        onChange={(e) => {
-                          setCfgName(e.target.value);
-                          setConfigDirty(true);
-                        }}
-                        className="h-10 w-full rounded-[6px] border border-[#2E3440] bg-[#17191D] px-3 text-sm text-[#F5F3ED] disabled:opacity-50"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold text-[#A0A6B2]">
-                        Race Duration (seconds, default 180)
-                      </label>
-                      <input
-                        type="number"
-                        min={30}
-                        max={1800}
-                        disabled={!isLobby}
-                        value={cfgDuration}
-                        onChange={(e) => {
-                          setCfgDuration(Number(e.target.value));
-                          setConfigDirty(true);
-                        }}
-                        className="h-10 w-full rounded-[6px] border border-[#2E3440] bg-[#17191D] px-3 font-mono text-sm text-[#F5F3ED] disabled:opacity-50"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Pool Size per Difficulty */}
-                  <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#A0A6B2]">
-                      Question Pool Distribution (Total:{" "}
-                      {cfgEasyCount + cfgMediumCount + cfgHardCount} questions)
-                    </p>
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-[6px] border border-[#22C55E]/30 bg-[#17191D] p-3">
-                        <label className="block text-xs font-bold text-[#22C55E]">
-                          Easy Questions ({enabledCounts.EASY} in bank)
-                        </label>
-                        <input
-                          type="number"
-                          min={1}
-                          max={enabledCounts.EASY}
-                          disabled={!isLobby}
-                          value={cfgEasyCount}
-                          onChange={(e) => {
-                            setCfgEasyCount(Number(e.target.value));
-                            setConfigDirty(true);
-                          }}
-                          className="mt-1.5 h-9 w-full rounded-[4px] border border-[#2E3440] bg-[#1F2329] px-2.5 font-mono text-sm text-[#F5F3ED]"
-                        />
-                      </div>
-
-                      <div className="rounded-[6px] border border-[#3898EC]/30 bg-[#17191D] p-3">
-                        <label className="block text-xs font-bold text-[#3898EC]">
-                          Medium Questions ({enabledCounts.MEDIUM} in bank)
-                        </label>
-                        <input
-                          type="number"
-                          min={1}
-                          max={enabledCounts.MEDIUM}
-                          disabled={!isLobby}
-                          value={cfgMediumCount}
-                          onChange={(e) => {
-                            setCfgMediumCount(Number(e.target.value));
-                            setConfigDirty(true);
-                          }}
-                          className="mt-1.5 h-9 w-full rounded-[4px] border border-[#2E3440] bg-[#1F2329] px-2.5 font-mono text-sm text-[#F5F3ED]"
-                        />
-                      </div>
-
-                      <div className="rounded-[6px] border border-[#FFD43B]/30 bg-[#17191D] p-3">
-                        <label className="block text-xs font-bold text-[#FFD43B]">
-                          Hard Questions ({enabledCounts.HARD} in bank)
-                        </label>
-                        <input
-                          type="number"
-                          min={1}
-                          max={enabledCounts.HARD}
-                          disabled={!isLobby}
-                          value={cfgHardCount}
-                          onChange={(e) => {
-                            setCfgHardCount(Number(e.target.value));
-                            setConfigDirty(true);
-                          }}
-                          className="mt-1.5 h-9 w-full rounded-[4px] border border-[#2E3440] bg-[#1F2329] px-2.5 font-mono text-sm text-[#F5F3ED]"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Step Rewards per Difficulty */}
-                  <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#A0A6B2]">
-                      Movement Step Rewards
-                    </p>
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <div>
-                        <label className="mb-1 block text-xs text-[#22C55E]">
-                          Easy Step Reward
-                        </label>
-                        <input
-                          type="number"
-                          min={1}
-                          max={10}
-                          disabled={!isLobby}
-                          value={cfgEasyReward}
-                          onChange={(e) => {
-                            setCfgEasyReward(Number(e.target.value));
-                            setConfigDirty(true);
-                          }}
-                          className="h-9 w-full rounded-[4px] border border-[#2E3440] bg-[#17191D] px-2.5 font-mono text-sm text-[#F5F3ED]"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs text-[#3898EC]">
-                          Medium Step Reward
-                        </label>
-                        <input
-                          type="number"
-                          min={1}
-                          max={10}
-                          disabled={!isLobby}
-                          value={cfgMediumReward}
-                          onChange={(e) => {
-                            setCfgMediumReward(Number(e.target.value));
-                            setConfigDirty(true);
-                          }}
-                          className="h-9 w-full rounded-[4px] border border-[#2E3440] bg-[#17191D] px-2.5 font-mono text-sm text-[#F5F3ED]"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs text-[#FFD43B]">
-                          Hard Step Reward
-                        </label>
-                        <input
-                          type="number"
-                          min={1}
-                          max={10}
-                          disabled={!isLobby}
-                          value={cfgHardReward}
-                          onChange={(e) => {
-                            setCfgHardReward(Number(e.target.value));
-                            setConfigDirty(true);
-                          }}
-                          className="h-9 w-full rounded-[4px] border border-[#2E3440] bg-[#17191D] px-2.5 font-mono text-sm text-[#F5F3ED]"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Abandon Toggle */}
-                  <div className="flex items-center justify-between rounded-[6px] border border-[#2E3440] bg-[#17191D] p-3">
-                    <div>
-                      <p className="text-xs font-semibold text-[#F5F3ED]">
-                        Allow Players to Abandon a Question
-                      </p>
-                      <p className="text-[11px] text-[#A0A6B2]">
-                        Abandoned questions grant 0 steps, never reveal the answer, and cannot be reused by that player.
-                      </p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      disabled={!isLobby}
-                      checked={cfgAllowAbandon}
-                      onChange={(e) => {
-                        setCfgAllowAbandon(e.target.checked);
-                        setConfigDirty(true);
-                      }}
-                      className="size-5 accent-[#00629B]"
-                    />
-                  </div>
-
-                  {isLobby && (
-                    <div className="flex justify-end">
-                      <Button
-                        type="submit"
-                        disabled={busy || !configDirty}
-                      >
-                        Save configuration
-                      </Button>
-                    </div>
-                  )}
-                </form>
-
-                {/* Right Column: Configuration Preview & QR */}
-                <div className="space-y-4">
-                  <div className="rounded-[8px] border border-[#2E3440] bg-[#1F2329] p-5 space-y-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="font-[family-name:var(--font-orbitron)] text-sm font-bold text-[#F5F3ED]">
-                        JOIN QR & SUMMARY
-                      </h3>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => setShowLargeQr(true)}
-                      >
-                        <Maximize2 className="size-3.5 text-[#FFD43B]" />
-                        <span>Enlarge QR</span>
-                      </Button>
-                    </div>
+                {/* Right Column: Join QR & Telemetry Summary */}
+                <Panel
+                  index="03"
+                  label="onboarding / qr & specs"
+                  rightSlot={
+                    <Button
+                      variant="secondary"
+                      size="xs"
+                      onClick={() => setShowLargeQr(true)}
+                    >
+                      <Maximize2 className="size-3 text-accent" />
+                      <span>enlarge</span>
+                    </Button>
+                  }
+                >
+                  <div className="p-4 space-y-4">
                     <button
                       type="button"
                       onClick={() => setShowLargeQr(true)}
                       title="Click to enlarge QR code"
-                      className="mx-auto flex w-fit overflow-hidden rounded-[6px] border-2 border-[#F5F3ED] bg-[#F5F3ED] p-1.5 transition-transform active:scale-95 cursor-pointer"
+                      className="mx-auto flex w-fit overflow-hidden rounded-[var(--radius-sm)] border border-border bg-white p-1.5 transition-transform active:scale-95 cursor-pointer"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -1010,301 +1100,305 @@ export default function AdminPortalPage() {
                         className="size-36 block"
                       />
                     </button>
-                    <p className="text-center font-mono text-xs text-[#3898EC] break-all">
+                    <p className="text-center font-mono text-xs text-accent break-all">
                       {joinUrl}
                     </p>
 
-                    <div className="space-y-2 border-t border-[#2E3440] pt-3 text-xs">
+                    <div className="space-y-2 border-t border-border pt-3 font-mono text-xs tabular-nums">
                       <div className="flex justify-between">
-                        <span className="text-[#A0A6B2]">Duration:</span>
-                        <span className="font-mono font-semibold">
+                        <span className="text-muted">duration</span>
+                        <span className="text-foreground">
                           {race.durationSec}s ({Math.floor(race.durationSec / 60)}m{" "}
                           {race.durationSec % 60}s)
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-[#A0A6B2]">Race Pool:</span>
-                        <span className="font-mono font-semibold">
+                        <span className="text-muted">race pool</span>
+                        <span className="text-foreground">
                           {race.easyCount}E / {race.mediumCount}M / {race.hardCount}H
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-[#A0A6B2]">Max Possible Steps:</span>
-                        <span className="font-mono font-semibold text-[#FFD43B]">
-                          {race.easyCount * race.easyReward +
-                            race.mediumCount * race.mediumReward +
-                            race.hardCount * race.hardReward}{" "}
-                          steps
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-[#A0A6B2]">Wrong Answer Penalty:</span>
-                        <span className="font-mono font-semibold text-[#EF4444]">
-                          3.0s lockout
-                        </span>
+                        <span className="text-muted">wrong penalty</span>
+                        <span className="text-danger">3.0s pit limiter</span>
                       </div>
                     </div>
                   </div>
-                </div>
+                </Panel>
               </div>
             </div>
           )}
 
-          {/* TAB 2: PARTICIPANTS & MODERATION */}
+          {/* TAB 2: DRIVER GRID & MODERATION */}
           {activeTab === "players" && (
-            <section className="rounded-[8px] border border-[#2E3440] bg-[#1F2329] p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="font-[family-name:var(--font-orbitron)] text-lg font-bold text-[#F5F3ED]">
-                    PARTICIPANTS ({players.length})
-                  </h2>
-                  <p className="text-xs text-[#A0A6B2]">
-                    Live standings and nickname moderation for {race.name}.
-                  </p>
+            <Panel
+              index="02"
+              label={`roster / driver grid (${players.length})`}
+              rightSlot={
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted" />
+                  <input
+                    type="search"
+                    value={playerSearch}
+                    onChange={(e) => setPlayerSearch(e.target.value)}
+                    placeholder="Filter callsign..."
+                    className="h-7 w-44 rounded-[var(--radius-xs)] border border-border bg-surface pl-8 pr-2.5 font-mono text-xs text-foreground placeholder:text-dim focus:border-accent focus:outline-none"
+                  />
                 </div>
-              </div>
-
-              {players.length === 0 ? (
-                <p className="py-10 text-center text-sm text-[#A0A6B2]">
-                  No players have joined this round yet.
-                </p>
+              }
+            >
+              {filteredPlayers.length === 0 ? (
+                <div className="p-10 text-center font-mono text-xs text-muted">
+                  {players.length === 0
+                    ? "No drivers have locked onto the grid for this session yet."
+                    : "No drivers match your search filter."}
+                </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-[#2E3440] text-[#A0A6B2] uppercase">
-                        <th className="py-2.5 px-3">Rank</th>
-                        <th className="py-2.5 px-3">Vehicle</th>
-                        <th className="py-2.5 px-3">Nickname</th>
-                        <th className="py-2.5 px-3">Steps</th>
-                        <th className="py-2.5 px-3">Correct / Wrong / Abandon</th>
-                        <th className="py-2.5 px-3 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#2E3440]/60">
-                      {players.map((p) => (
-                        <tr key={p.id} className="hover:bg-[#282D35]/40">
-                          <td className="py-2.5 px-3 font-[family-name:var(--font-orbitron)] font-bold text-[#FFD43B]">
-                            P{p.rank}
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <RaceCarSvg
-                              color={p.carColor}
-                              carNumber={p.carNumber}
-                              size="sm"
-                            />
-                          </td>
-                          <td className="py-2.5 px-3 font-semibold text-[#F5F3ED]">
-                            {editingPlayerId === p.id ? (
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="text"
-                                  value={editingNickname}
-                                  onChange={(e) => setEditingNickname(e.target.value)}
-                                  className="h-8 rounded border border-[#3898EC] bg-[#17191D] px-2 text-xs"
-                                />
-                                <Button
-                                  size="sm"
-                                  onClick={() => void handleRenamePlayer(p.id)}
-                                >
-                                  Save
-                                </Button>
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  onClick={() => setEditingPlayerId(null)}
-                                >
-                                  Cancel
-                                </Button>
-                              </div>
-                            ) : (
-                              p.nickname
-                            )}
-                          </td>
-                          <td className="py-2.5 px-3 font-[family-name:var(--font-orbitron)] text-sm font-bold text-[#FFD43B]">
-                            {p.totalSteps}
-                          </td>
-                          <td className="py-2.5 px-3 font-mono">
-                            <span className="text-[#22C55E]">{p.correctCount}✓</span>{" "}
-                            / <span className="text-[#EF4444]">{p.wrongCount}✗</span>{" "}
-                            / <span className="text-[#A0A6B2]">{p.abandonedCount}↺</span>
-                          </td>
-                          <td className="py-2.5 px-3 text-right space-x-2">
+                <Table>
+                  <TableHead>
+                    <tr>
+                      <TableHeaderCell>pos</TableHeaderCell>
+                      <TableHeaderCell>unit</TableHeaderCell>
+                      <TableHeaderCell>callsign</TableHeaderCell>
+                      <TableHeaderCell>steps</TableHeaderCell>
+                      <TableHeaderCell>hit / miss / burn</TableHeaderCell>
+                      <TableHeaderCell className="text-right">
+                        moderation
+                      </TableHeaderCell>
+                    </tr>
+                  </TableHead>
+                  <TableBody>
+                    {filteredPlayers.map((p) => (
+                      <TableRow key={p.id}>
+                        <TableCell className="font-mono font-semibold text-accent tabular-nums">
+                          P{p.rank}
+                        </TableCell>
+                        <TableCell>
+                          <RaceCarSvg
+                            color={p.carColor}
+                            carNumber={p.carNumber}
+                            size="sm"
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium text-foreground">
+                          {editingPlayerId === p.id ? (
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                value={editingNickname}
+                                onChange={(e) => setEditingNickname(e.target.value)}
+                                className="h-7 rounded-[var(--radius-xs)] border border-accent bg-subtle px-2 font-mono text-xs text-foreground focus:outline-none"
+                              />
+                              <Button
+                                size="xs"
+                                onClick={() => void handleRenamePlayer(p.id)}
+                              >
+                                save
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="xs"
+                                onClick={() => setEditingPlayerId(null)}
+                              >
+                                cancel
+                              </Button>
+                            </div>
+                          ) : (
+                            p.nickname
+                          )}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm font-semibold text-foreground tabular-nums">
+                          {p.totalSteps}
+                        </TableCell>
+                        <TableCell className="font-mono tabular-nums">
+                          <span className="text-ok">{p.correctCount}✓</span>
+                          <span className="mx-1 text-dim">/</span>
+                          <span className="text-danger">{p.wrongCount}✗</span>
+                          <span className="mx-1 text-dim">/</span>
+                          <span className="text-muted">{p.abandonedCount}↺</span>
+                        </TableCell>
+                        <TableCell className="text-right space-x-1.5 whitespace-nowrap">
+                          <Button
+                            variant="secondary"
+                            size="xs"
+                            onClick={() => {
+                              setEditingPlayerId(p.id);
+                              setEditingNickname(p.nickname);
+                            }}
+                          >
+                            rename
+                          </Button>
+                          {confirmKey === `rm-${p.id}` ? (
                             <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => {
-                                setEditingPlayerId(p.id);
-                                setEditingNickname(p.nickname);
-                              }}
+                              variant="danger"
+                              size="xs"
+                              onClick={() => void handleRemovePlayer(p.id)}
                             >
-                              Rename
+                              confirm remove
                             </Button>
-                            {confirmKey === `rm-${p.id}` ? (
-                              <Button
-                                variant="danger"
-                                size="sm"
-                                onClick={() => void handleRemovePlayer(p.id)}
-                              >
-                                Confirm remove
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="danger"
-                                size="sm"
-                                onClick={() => setConfirmKey(`rm-${p.id}`)}
-                              >
-                                <Trash2 className="size-3.5" />
-                                <span>Remove</span>
-                              </Button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              onClick={() => setConfirmKey(`rm-${p.id}`)}
+                              className="text-danger hover:text-danger"
+                            >
+                              <Trash2 className="size-3" />
+                              <span>remove</span>
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
-            </section>
+            </Panel>
           )}
 
           {/* TAB 3: QUESTION BANK MANAGER */}
           {activeTab === "questions" && (
-            <section className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-[8px] border border-[#2E3440] bg-[#1F2329] p-5">
-                <div>
-                  <h2 className="font-[family-name:var(--font-orbitron)] text-lg font-bold text-[#F5F3ED]">
-                    QUESTION BANK ({questions.length} TOTAL)
-                  </h2>
-                  <p className="text-xs text-[#A0A6B2]">
-                    Enabled: {enabledCounts.EASY} Easy • {enabledCounts.MEDIUM}{" "}
-                    Medium • {enabledCounts.HARD} Hard
-                  </p>
-                </div>
+            <div className="space-y-4">
+              <Panel
+                index="03"
+                label={`telemetry bank (${questions.length} total)`}
+                rightSlot={
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-sm)] border border-border bg-elevated px-2.5 font-mono text-xs text-foreground transition-colors hover:border-border-strong cursor-pointer">
+                      <Upload className="size-3.5 text-accent" />
+                      <span>import json</span>
+                      <input
+                        type="file"
+                        accept=".json"
+                        onChange={handleImportJsonFile}
+                        className="hidden"
+                      />
+                    </label>
+                    <Button size="sm" onClick={openNewQuestionModal}>
+                      <Plus className="size-3.5" />
+                      <span>new question</span>
+                    </Button>
+                  </div>
+                }
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {(["ALL", "EASY", "MEDIUM", "HARD"] as const).map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => setFilterDiff(d)}
+                        className={cn(
+                          "rounded-[var(--radius-xs)] border px-2.5 py-1 font-mono text-[11px] lowercase transition-colors cursor-pointer",
+                          filterDiff === d
+                            ? "border-accent bg-accent text-accent-fg font-semibold"
+                            : "border-border bg-subtle text-muted hover:text-foreground",
+                        )}
+                      >
+                        {d.toLowerCase()}
+                      </button>
+                    ))}
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <label className="inline-flex h-9 items-center gap-1.5 rounded-[6px] border border-[#2E3440] bg-[#282D35] px-3 text-xs font-semibold text-[#F5F3ED] cursor-pointer">
-                    <Upload className="size-3.5 text-[#3898EC]" />
-                    <span>Import JSON</span>
+                    <select
+                      value={filterCat}
+                      onChange={(e) => setFilterCat(e.target.value)}
+                      className="h-7 rounded-[var(--radius-xs)] border border-border bg-subtle px-2.5 font-mono text-xs text-foreground focus:border-accent focus:outline-none"
+                    >
+                      <option value="ALL">all categories</option>
+                      <option value="HTML">HTML</option>
+                      <option value="CSS">CSS</option>
+                      <option value="JavaScript">JavaScript</option>
+                      <option value="React">React</option>
+                      <option value="Fundamentals">Fundamentals</option>
+                      <option value="APIs">APIs</option>
+                      <option value="Logic">Logic</option>
+                    </select>
+                  </div>
+
+                  <div className="relative flex-1 min-w-[200px] max-w-xs">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted" />
                     <input
-                      type="file"
-                      accept=".json"
-                      onChange={handleImportJsonFile}
-                      className="hidden"
+                      type="search"
+                      value={questionSearch}
+                      onChange={(e) => setQuestionSearch(e.target.value)}
+                      placeholder="Search prompt or code..."
+                      className="h-7 w-full rounded-[var(--radius-xs)] border border-border bg-subtle pl-8 pr-2.5 font-mono text-xs text-foreground placeholder:text-dim focus:border-accent focus:outline-none"
                     />
-                  </label>
-                  <Button size="sm" onClick={openNewQuestionModal}>
-                    <Plus className="size-3.5" />
-                    <span>Add question</span>
-                  </Button>
+                  </div>
                 </div>
-              </div>
+              </Panel>
 
-              {/* Filter Bar */}
-              <div className="flex flex-wrap items-center gap-2">
-                {(["ALL", "EASY", "MEDIUM", "HARD"] as const).map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    onClick={() => setFilterDiff(d)}
-                    className={cn(
-                      "rounded-[6px] border px-3 py-1.5 font-mono text-xs font-semibold cursor-pointer",
-                      filterDiff === d
-                        ? "border-[#3898EC] bg-[#00629B] text-[#F5F3ED]"
-                        : "border-[#2E3440] bg-[#1F2329] text-[#A0A6B2]",
-                    )}
-                  >
-                    {d}
-                  </button>
-                ))}
-
-                <select
-                  value={filterCat}
-                  onChange={(e) => setFilterCat(e.target.value)}
-                  className="h-8 rounded-[6px] border border-[#2E3440] bg-[#1F2329] px-3 text-xs text-[#F5F3ED]"
-                >
-                  <option value="ALL">All Categories</option>
-                  <option value="HTML">HTML</option>
-                  <option value="CSS">CSS</option>
-                  <option value="JavaScript">JavaScript</option>
-                  <option value="React">React</option>
-                  <option value="Fundamentals">Fundamentals</option>
-                  <option value="APIs">APIs</option>
-                  <option value="Logic">Logic</option>
-                </select>
-              </div>
-
-              {/* Question List */}
-              <div className="space-y-3">
+              {/* Question Rows */}
+              <div className="space-y-2.5">
                 {filteredQuestions.map((q) => (
                   <div
                     key={q.id}
                     className={cn(
-                      "rounded-[8px] border border-[#2E3440] bg-[#1F2329] p-4 space-y-2.5",
+                      "rounded-[var(--radius-md)] border border-border bg-surface p-4 space-y-2.5 transition-opacity",
                       !q.enabled && "opacity-50",
                     )}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <span
-                          className={cn(
-                            "rounded-[4px] px-2 py-0.5 font-[family-name:var(--font-orbitron)] text-[11px] font-bold",
-                            q.difficulty === "EASY" &&
-                              "bg-[#22C55E]/20 text-[#22C55E]",
-                            q.difficulty === "MEDIUM" &&
-                              "bg-[#3898EC]/20 text-[#3898EC]",
-                            q.difficulty === "HARD" &&
-                              "bg-[#FFD43B]/20 text-[#FFD43B]",
-                          )}
+                        <Chip
+                          tone={
+                            q.difficulty === "EASY"
+                              ? "ok"
+                              : q.difficulty === "HARD"
+                                ? "accent"
+                                : "strong"
+                          }
                         >
-                          {q.difficulty}
-                        </span>
-                        <span className="rounded-[4px] bg-[#282D35] px-2 py-0.5 font-mono text-[11px] text-[#A0A6B2]">
-                          {q.category}
-                        </span>
+                          {q.difficulty.toLowerCase()}
+                        </Chip>
+                        <Chip tone="neutral">{q.category}</Chip>
+                        <Chip tone={q.enabled ? "ok" : "neutral"} dot>
+                          {q.enabled ? "enabled" : "disabled"}
+                        </Chip>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <Button
                           variant="secondary"
-                          size="sm"
+                          size="xs"
                           onClick={() =>
                             void handleToggleQuestion(q.id, !q.enabled)
                           }
                         >
-                          {q.enabled ? "Disable" : "Enable"}
+                          {q.enabled ? "disable" : "enable"}
                         </Button>
                         <Button
                           variant="secondary"
-                          size="sm"
+                          size="xs"
                           onClick={() => openEditQuestionModal(q)}
                         >
-                          Edit
+                          edit
                         </Button>
                         <Button
-                          variant="danger"
-                          size="sm"
+                          variant="ghost"
+                          size="xs"
                           onClick={() => void handleDeleteQuestion(q.id)}
+                          className="text-danger hover:text-danger"
                         >
-                          Delete
+                          delete
                         </Button>
                       </div>
                     </div>
 
-                    <p className="text-sm font-semibold text-[#F5F3ED]">
+                    <p className="text-sm font-medium text-foreground">
                       {q.prompt}
                     </p>
                     {q.codeSnippet && <CodeBlock code={q.codeSnippet} />}
 
-                    <div className="grid gap-2 sm:grid-cols-2 pt-1">
+                    <div className="grid gap-1.5 sm:grid-cols-2 pt-1">
                       {q.options.map((opt, idx) => (
                         <div
                           key={idx}
                           className={cn(
-                            "rounded-[4px] border px-2.5 py-1.5 text-xs",
+                            "rounded-[var(--radius-xs)] border px-2.5 py-1.5 font-mono text-xs",
                             idx === q.correctIndex
-                              ? "border-[#22C55E] bg-[#22C55E]/15 text-[#F5F3ED] font-semibold"
-                              : "border-[#2E3440] bg-[#17191D] text-[#A0A6B2]",
+                              ? "border-ok/50 bg-ok-subtle text-foreground font-medium"
+                              : "border-border bg-subtle text-muted",
                           )}
                         >
                           {["A", "B", "C", "D"][idx]}. {opt}
@@ -1314,89 +1408,99 @@ export default function AdminPortalPage() {
                   </div>
                 ))}
               </div>
-            </section>
+            </div>
           )}
 
           {/* TAB 4: RESULTS & CSV EXPORT */}
           {activeTab === "results" && (
-            <section className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-[8px] border border-[#2E3440] bg-[#1F2329] p-5">
-                <div>
-                  <h2 className="font-[family-name:var(--font-orbitron)] text-lg font-bold text-[#F5F3ED]">
-                    ROUND STANDINGS & CSV EXPORT
-                  </h2>
-                  <p className="text-xs text-[#A0A6B2]">
-                    Export official tie-broken results for event prizes and records.
-                  </p>
+            <div className="space-y-4">
+              <Panel
+                index="04"
+                label="classification / official export"
+                rightSlot={
+                  <a
+                    href={`/api/admin/export?raceId=${race.id}`}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-sm)] bg-accent px-3 font-mono text-xs font-medium text-accent-fg"
+                  >
+                    <Download className="size-3.5" />
+                    <span>export current csv</span>
+                  </a>
+                }
+              >
+                <div className="p-4 text-xs text-muted">
+                  Tie-breaker hierarchy: total movement steps (desc) → total
+                  correct answers (desc) → earliest server timestamp of final
+                  step.
                 </div>
-                <a
-                  href={`/api/admin/export?raceId=${race.id}`}
-                  className="inline-flex h-10 items-center gap-2 rounded-[6px] bg-[#00629B] px-4 text-xs font-semibold text-[#F5F3ED]"
-                >
-                  <Download className="size-4" />
-                  <span>Export current round CSV</span>
-                </a>
-              </div>
+              </Panel>
 
               {history.length === 0 ? (
-                <div className="rounded-[8px] border border-[#2E3440] bg-[#1F2329] p-8 text-center text-sm text-[#A0A6B2]">
-                  No archived rounds yet. Completed rounds appear here automatically when ended or when a new round is created.
+                <div className="rounded-[var(--radius-md)] border border-border bg-surface p-8 text-center font-mono text-xs text-muted">
+                  No archived rounds yet. Completed sessions are logged here
+                  automatically when ended or when a new round is created.
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {history.map((item) => (
                     <div
                       key={item.race.id}
-                      className="rounded-[8px] border border-[#2E3440] bg-[#1F2329] p-5 space-y-3"
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-border bg-surface p-4"
                     >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-[family-name:var(--font-orbitron)] text-base font-bold text-[#F5F3ED]">
-                            {item.race.name}
-                          </h3>
-                          <p className="font-mono text-xs text-[#A0A6B2]">
-                            {item.standings.length} players • Winner:{" "}
-                            {item.standings[0]?.nickname ?? "N/A"} (
-                            {item.standings[0]?.totalSteps ?? 0} steps)
-                          </p>
-                        </div>
-                        <a
-                          href={`/api/admin/export?raceId=${item.race.id}`}
-                          className="inline-flex h-9 items-center gap-1.5 rounded-[6px] border border-[#2E3440] bg-[#282D35] px-3 text-xs font-semibold text-[#F5F3ED]"
-                        >
-                          <Download className="size-3.5" />
-                          <span>Download CSV</span>
-                        </a>
+                      <div>
+                        <h3 className="font-sans text-sm font-semibold text-foreground">
+                          {item.race.name}
+                        </h3>
+                        <p className="font-mono text-xs text-muted tabular-nums">
+                          {item.standings.length} drivers · P1:{" "}
+                          {item.standings[0]?.nickname ?? "N/A"} (
+                          {item.standings[0]?.totalSteps ?? 0} steps)
+                        </p>
                       </div>
+                      <a
+                        href={`/api/admin/export?raceId=${item.race.id}`}
+                        className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-sm)] border border-border bg-elevated px-3 font-mono text-xs text-foreground hover:border-border-strong"
+                      >
+                        <Download className="size-3.5 text-accent" />
+                        <span>download csv</span>
+                      </a>
                     </div>
                   ))}
                 </div>
               )}
-            </section>
+            </div>
           )}
         </main>
       </div>
 
       {/* Add / Edit Question Modal */}
       {showQuestionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/85 backdrop-blur-sm p-4">
           <form
             onSubmit={handleSaveQuestion}
-            className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[8px] border border-[#2E3440] bg-[#1F2329] p-6 space-y-4"
+            className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[var(--radius-md)] border border-border-strong bg-surface p-6 space-y-4"
           >
-            <h3 className="font-[family-name:var(--font-orbitron)] text-lg font-bold text-[#F5F3ED]">
-              {qId ? "EDIT QUESTION" : "ADD QUESTION"}
-            </h3>
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <Label index="bank" tone="accent">
+                {qId ? "edit telemetry item" : "new telemetry item"}
+              </Label>
+              <button
+                type="button"
+                onClick={() => setShowQuestionModal(false)}
+                className="text-muted hover:text-foreground cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1 block text-xs text-[#A0A6B2]">
-                  Difficulty
+                <label className="mb-1 block font-mono text-[11px] text-muted">
+                  gear difficulty
                 </label>
                 <select
                   value={qDiff}
                   onChange={(e) => setQDiff(e.target.value as Difficulty)}
-                  className="h-10 w-full rounded-[6px] border border-[#2E3440] bg-[#17191D] px-3 text-xs text-[#F5F3ED]"
+                  className="h-9 w-full rounded-[var(--radius-sm)] border border-border bg-subtle px-3 font-mono text-xs text-foreground"
                 >
                   <option value="EASY">EASY</option>
                   <option value="MEDIUM">MEDIUM</option>
@@ -1404,13 +1508,13 @@ export default function AdminPortalPage() {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs text-[#A0A6B2]">
-                  Category
+                <label className="mb-1 block font-mono text-[11px] text-muted">
+                  category
                 </label>
                 <select
                   value={qCat}
                   onChange={(e) => setQCat(e.target.value as QuestionCategory)}
-                  className="h-10 w-full rounded-[6px] border border-[#2E3440] bg-[#17191D] px-3 text-xs text-[#F5F3ED]"
+                  className="h-9 w-full rounded-[var(--radius-sm)] border border-border bg-subtle px-3 font-mono text-xs text-foreground"
                 >
                   <option value="HTML">HTML</option>
                   <option value="CSS">CSS</option>
@@ -1424,33 +1528,33 @@ export default function AdminPortalPage() {
             </div>
 
             <div>
-              <label className="mb-1 block text-xs text-[#A0A6B2]">
-                Question Prompt
+              <label className="mb-1 block font-mono text-[11px] text-muted">
+                question prompt
               </label>
               <textarea
                 required
                 rows={2}
                 value={qPrompt}
                 onChange={(e) => setQPrompt(e.target.value)}
-                className="w-full rounded-[6px] border border-[#2E3440] bg-[#17191D] p-2.5 text-sm text-[#F5F3ED]"
+                className="w-full rounded-[var(--radius-sm)] border border-border bg-subtle p-2.5 text-sm text-foreground"
               />
             </div>
 
             <div>
-              <label className="mb-1 block text-xs text-[#A0A6B2]">
-                Optional Code Snippet
+              <label className="mb-1 block font-mono text-[11px] text-muted">
+                optional code snippet
               </label>
               <textarea
                 rows={3}
                 value={qCode}
                 onChange={(e) => setQCode(e.target.value)}
-                className="w-full rounded-[6px] border border-[#2E3440] bg-[#111317] p-2.5 font-mono text-xs text-[#F5F3ED]"
+                className="w-full rounded-[var(--radius-sm)] border border-border bg-subtle p-2.5 font-mono text-xs text-foreground"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="block text-xs text-[#A0A6B2]">
-                Answer Options (select radio for the correct option)
+              <label className="block font-mono text-[11px] text-muted">
+                answer options (select radio for correct option)
               </label>
               {[
                 { val: qOpt0, set: setQOpt0, idx: 0 as const },
@@ -1464,7 +1568,7 @@ export default function AdminPortalPage() {
                     name="correctIndex"
                     checked={qCorrect === item.idx}
                     onChange={() => setQCorrect(item.idx)}
-                    className="size-4 accent-[#22C55E]"
+                    className="size-4 accent-[var(--semantic-ok)]"
                   />
                   <input
                     type="text"
@@ -1472,7 +1576,7 @@ export default function AdminPortalPage() {
                     placeholder={`Option ${["A", "B", "C", "D"][item.idx]}`}
                     value={item.val}
                     onChange={(e) => item.set(e.target.value)}
-                    className="h-9 flex-1 rounded-[6px] border border-[#2E3440] bg-[#17191D] px-3 text-xs text-[#F5F3ED]"
+                    className="h-9 flex-1 rounded-[var(--radius-sm)] border border-border bg-subtle px-3 text-xs text-foreground"
                   />
                 </div>
               ))}
@@ -1486,7 +1590,7 @@ export default function AdminPortalPage() {
                 Cancel
               </Button>
               <Button type="submit" disabled={busy}>
-                Save question
+                Save item
               </Button>
             </div>
           </form>
@@ -1497,19 +1601,19 @@ export default function AdminPortalPage() {
       {showLargeQr && (
         <div
           onClick={() => setShowLargeQr(false)}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-sm p-4"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-2xl rounded-[8px] border-2 border-[#00629B] bg-[#1F2329] p-6 text-center space-y-5"
+            className="w-full max-w-2xl rounded-[var(--radius-md)] border border-border-strong bg-surface p-6 text-center space-y-5"
           >
-            <div className="flex items-center justify-between border-b border-[#2E3440] pb-3">
+            <div className="flex items-center justify-between border-b border-border pb-3">
               <div className="text-left">
-                <span className="inline-block rounded-[4px] bg-[#00629B] px-2.5 py-0.5 font-[family-name:var(--font-orbitron)] text-xs font-bold text-[#F5F3ED]">
-                  SCAN TO JOIN RACE
-                </span>
-                <h3 className="mt-1 font-[family-name:var(--font-orbitron)] text-lg font-bold text-[#F5F3ED]">
-                  {race.name} • {players.length} Racers Joined
+                <Label index="qr" tone="accent">
+                  driver onboarding
+                </Label>
+                <h3 className="mt-1 font-sans text-lg font-semibold text-foreground">
+                  {race.name} · {players.length} drivers on grid
                 </h3>
               </div>
               <Button
@@ -1517,37 +1621,38 @@ export default function AdminPortalPage() {
                 size="sm"
                 onClick={() => setShowLargeQr(false)}
               >
-                <X className="size-4" />
-                <span>Close</span>
+                <X className="size-3.5" />
+                <span>close</span>
               </Button>
             </div>
 
-            <div className="mx-auto flex w-fit overflow-hidden rounded-[8px] border-4 border-[#F5F3ED] bg-[#F5F3ED] p-3">
+            <div className="mx-auto flex w-fit overflow-hidden rounded-[var(--radius-md)] border border-border bg-white p-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={`/api/qr?url=${encodeURIComponent(joinUrl)}`}
                 alt="Large Join QR"
-                className="size-72 sm:size-96 md:size-[420px] block"
+                className="size-72 sm:size-96 md:size-[400px] block"
               />
             </div>
 
             <div className="space-y-2">
-              <p className="font-[family-name:var(--font-orbitron)] text-xl sm:text-2xl font-bold text-[#3898EC] break-all">
+              <p className="font-mono text-xl sm:text-2xl font-semibold text-foreground break-all">
                 {joinUrl}
               </p>
               <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                <CopyButton value={joinUrl} label="Copy join link" />
+                <CopyButton value={joinUrl} label="copy /play link" />
                 {isLobby && (
                   <Button
+                    variant="primary"
+                    size="lg"
                     disabled={busy}
                     onClick={() => {
                       setShowLargeQr(false);
                       void runRaceAction("start");
                     }}
-                    className="bg-[#22C55E] text-[#17191D] border-[#16A34A] font-[family-name:var(--font-orbitron)] font-black px-6"
                   >
                     <Play className="size-4 fill-current" />
-                    <span>Start race now ({players.length} racers)</span>
+                    <span>Start race now ({players.length} drivers)</span>
                   </Button>
                 )}
               </div>

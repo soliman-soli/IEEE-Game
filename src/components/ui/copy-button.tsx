@@ -33,12 +33,12 @@ export function CopyButton({
     >
       {copied ? (
         <>
-          <Check className="size-3.5 text-[#22C55E]" />
-          <span>Copied</span>
+          <Check className="size-3.5 text-ok" />
+          <span>copied</span>
         </>
       ) : (
         <>
-          <Copy className="size-3.5 text-[#A0A6B2]" />
+          <Copy className="size-3.5 text-muted" />
           <span>{label}</span>
         </>
       )}

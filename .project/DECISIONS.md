@@ -31,6 +31,7 @@
 | D-026 | 2026-11-15 | Motion: motion/react for Player/Admin transitions & feedback; plain CSS transforms for Display cars | Approved |
 | D-027 | 2026-11-15 | Audio: Display only (start lights, gain blips, lead change, winner fanfare, light music); phone vibration on correct/wrong where supported | Approved |
 | D-028 | 2026-11-15 | Phase 2 (Product Definition) & Phase 3 (Visual Design) approved; dual-mode repository adapter (Supabase Postgres + automatic local JSON-backed fallback store when Supabase env vars are absent) | Approved |
+| D-029 | 2026-11-15 | Duckurity-caliber UI/UX redesign: Pit Wall Telemetry metaphor, Carbon Dark + FIA Paper Light theme tokens, Geist + Geist Mono only (Orbitron dropped), Headline Option A ("Ship answers at race pace."), interactive hero telemetry strip + surface mini-previews, shared UI primitive kit (Button, Card, Chip, Stat, Panel, Table, Label, ThemeToggle) | Approved |
 
 ## Supabase authority design (consequences of D-023, to detail in Phase 2)
 - **Timer:** `started_at` / `ends_at` set by DB `now()` on Start. Every answer RPC checks `now() < ends_at` inside the transaction → exact cut-off, no cron needed. Race status after `ends_at` is derived; `finalize_race()` is idempotent (called by Display/Admin at 00:00, safe to call twice).

@@ -1,8 +1,23 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Flag, Maximize2, QrCode, Trophy, Users, Volume2, VolumeX, X } from "lucide-react";
+import Link from "next/link";
+import { motion } from "motion/react";
+import {
+  ArrowLeft,
+  Maximize2,
+  QrCode,
+  Trophy,
+  Users,
+  Volume2,
+  VolumeX,
+  X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Chip } from "@/components/ui/chip";
+import { Label } from "@/components/ui/label";
 import { RaceCarSvg } from "@/components/ui/race-car-svg";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { raceAudio } from "@/lib/audio";
 import {
   getServerNowMs,
@@ -11,7 +26,7 @@ import {
 } from "@/lib/clock";
 import { cn } from "@/lib/cn";
 import { computeAutoZoomScale } from "@/lib/engine/rules";
-import type { Difficulty, PublicPlayer, RacePublicSnapshot } from "@/lib/engine/types";
+import type { Difficulty, RacePublicSnapshot } from "@/lib/engine/types";
 
 interface StepPopItem {
   eventId: string;
@@ -59,7 +74,6 @@ export default function LiveRaceDisplayPage() {
           const prevEventId = seenEventsRef.current.get(p.id);
           if (prevEventId !== p.lastStepEventId) {
             seenEventsRef.current.set(p.id, p.lastStepEventId);
-            // Only trigger pop if this isn't the initial page load
             if (prevStatusRef.current !== null) {
               newPops[p.id] = {
                 eventId: p.lastStepEventId,
@@ -209,55 +223,63 @@ export default function LiveRaceDisplayPage() {
   const fieldStripPlayers = isAdaptiveSplit ? players.slice(12) : [];
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#17191D] text-[#F5F3ED] select-none">
-      {/* Top Broadcast Header (84px) */}
-      <header className="flex h-[84px] shrink-0 items-center justify-between border-b-2 border-[#2E3440] bg-[#1F2329] px-6">
-        {/* Left: Brand & Round Status */}
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground select-none">
+      {/* Top Pit Wall Broadcast Bar (88px) */}
+      <header className="flex h-[88px] shrink-0 items-center justify-between border-b border-border bg-surface px-6 lg:px-8">
+        {/* Left: Brand & Session Status */}
         <div className="flex items-center gap-4">
-          <div className="flex size-12 items-center justify-center rounded-[6px] bg-[#00629B] text-[#F5F3ED]">
-            <Flag className="size-6" />
-          </div>
+          <Link
+            href="/"
+            aria-label="Back to surfaces"
+            className="flex size-10 items-center justify-center rounded-[var(--radius-sm)] border border-border bg-subtle text-muted transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="size-4" />
+          </Link>
           <div>
-            <div className="flex items-center gap-2.5">
-              <span className="font-[family-name:var(--font-orbitron)] text-xl font-black tracking-tight text-[#F5F3ED]">
-                IEEE GRAND PRIX
+            <div className="flex items-center gap-3">
+              <span className="font-sans text-xl font-semibold tracking-[-0.025em] text-foreground lg:text-2xl">
+                IEEE Grand Prix
               </span>
-              <span
-                className={cn(
-                  "rounded-[4px] px-2.5 py-0.5 font-[family-name:var(--font-orbitron)] text-xs font-bold",
-                  effectiveStatus === "RACING" &&
-                    "bg-[#22C55E] text-[#17191D]",
-                  effectiveStatus === "COUNTDOWN" &&
-                    "bg-[#FFD43B] text-[#17191D]",
-                  effectiveStatus === "LOBBY" &&
-                    "border border-[#3898EC] bg-[#00629B]/30 text-[#3898EC]",
-                  effectiveStatus === "FINISHED" &&
-                    "bg-[#FFD43B] text-[#17191D]",
-                )}
+              <Chip
+                tone={
+                  effectiveStatus === "RACING"
+                    ? "ok"
+                    : effectiveStatus === "COUNTDOWN" ||
+                        effectiveStatus === "FINISHED"
+                      ? "accent"
+                      : "neutral"
+                }
+                dot
               >
-                {effectiveStatus}
-              </span>
+                {effectiveStatus.toLowerCase()}
+              </Chip>
             </div>
-            <p className="font-mono text-xs text-[#A0A6B2]">
-              {race?.name ?? "Round 1"} • Easy +{race?.easyReward ?? 1} / Med +
-              {race?.mediumReward ?? 2} / Hard +{race?.hardReward ?? 3}
+            <p className="mt-0.5 font-mono text-xs text-muted tabular-nums">
+              02 / broadcast · {race?.name ?? "Round 1"} · easy +
+              {race?.easyReward ?? 1} / med +{race?.mediumReward ?? 2} / hard +
+              {race?.hardReward ?? 3}
             </p>
           </div>
         </div>
 
-        {/* Center: Giant Global Countdown */}
-        <div className="flex items-center gap-4 rounded-[8px] border border-[#2E3440] bg-[#17191D] px-8 py-2">
-          <span className="font-mono text-xs uppercase tracking-widest text-[#A0A6B2]">
-            RACE CLOCK
-          </span>
+        {/* Center: 10-Meter Legible Authoritative Race Clock */}
+        <div className="flex items-center gap-5 rounded-[var(--radius-md)] border border-border bg-subtle px-7 py-2">
+          <div className="text-right">
+            <span className="block font-mono text-[11px] lowercase tracking-[0.04em] text-muted">
+              race clock
+            </span>
+            <span className="block font-mono text-[10px] text-dim">
+              server sync
+            </span>
+          </div>
           <span
             className={cn(
-              "font-[family-name:var(--font-orbitron)] text-5xl font-black tracking-tight tabular-nums",
+              "font-mono text-5xl font-semibold tracking-[-0.03em] tabular-nums lg:text-6xl",
               effectiveStatus === "RACING" && raceRemainingMs <= 10000
-                ? "text-[#EF4444]"
+                ? "text-danger"
                 : effectiveStatus === "RACING" && raceRemainingMs <= 30000
-                  ? "text-[#FFD43B]"
-                  : "text-[#F5F3ED]",
+                  ? "text-accent"
+                  : "text-foreground",
             )}
           >
             {effectiveStatus === "LOBBY"
@@ -268,26 +290,28 @@ export default function LiveRaceDisplayPage() {
           </span>
         </div>
 
-        {/* Right: Telemetry & Broadcast Controls */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 rounded-[6px] border border-[#2E3440] bg-[#17191D] px-3.5 py-2">
-            <Users className="size-4 text-[#3898EC]" />
-            <span className="font-[family-name:var(--font-orbitron)] text-base font-bold tabular-nums">
+        {/* Right: Grid Count & Broadcast Controls */}
+        <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 rounded-[var(--radius-sm)] border border-border bg-subtle px-4 py-2 font-mono">
+            <Users className="size-4 text-accent" />
+            <span className="text-lg font-semibold text-foreground tabular-nums">
               {players.length}
             </span>
-            <span className="text-xs text-[#A0A6B2]">RACERS</span>
+            <span className="text-xs lowercase text-muted">cars</span>
           </div>
+
+          <ThemeToggle className="h-10 px-3" />
 
           <button
             type="button"
             onClick={toggleMute}
             aria-label={muted ? "Unmute race audio" : "Mute race audio"}
-            className="flex size-10 items-center justify-center rounded-[6px] border border-[#2E3440] bg-[#282D35] text-[#F5F3ED] cursor-pointer"
+            className="flex size-10 items-center justify-center rounded-[var(--radius-sm)] border border-border bg-subtle text-foreground transition-colors hover:border-border-strong cursor-pointer"
           >
             {muted ? (
-              <VolumeX className="size-5 text-[#EF4444]" />
+              <VolumeX className="size-4 text-danger" />
             ) : (
-              <Volume2 className="size-5 text-[#22C55E]" />
+              <Volume2 className="size-4 text-ok" />
             )}
           </button>
 
@@ -295,35 +319,35 @@ export default function LiveRaceDisplayPage() {
             type="button"
             onClick={toggleFullscreen}
             aria-label="Toggle fullscreen"
-            className="flex size-10 items-center justify-center rounded-[6px] border border-[#2E3440] bg-[#282D35] text-[#F5F3ED] cursor-pointer"
+            className="flex size-10 items-center justify-center rounded-[var(--radius-sm)] border border-border bg-subtle text-foreground transition-colors hover:border-border-strong cursor-pointer"
           >
-            <Maximize2 className="size-5" />
+            <Maximize2 className="size-4" />
           </button>
         </div>
       </header>
 
-      {/* Main Broadcast Stage: Left 74% Drag Strip + Right 26% Timing Tower */}
-      <div className="relative grid flex-1 grid-cols-[1fr_380px] overflow-hidden xl:grid-cols-[1fr_420px]">
-        {/* LEFT: 2D Straight Drag Strip */}
-        <section className="relative flex flex-col justify-between overflow-hidden bg-[#17191D]">
+      {/* Main Broadcast Stage: Left Drag Strip + Right Timing Tower */}
+      <div className="relative grid flex-1 grid-cols-[1fr_400px] overflow-hidden xl:grid-cols-[1fr_460px]">
+        {/* LEFT: Straight Sector Drag Strip */}
+        <section className="relative flex flex-col justify-between overflow-hidden bg-background telemetry-grid">
           {/* Top Kerb */}
-          <div className="kerb-stripe h-3 w-full shrink-0 border-b border-[#2E3440]" />
+          <div className="kerb-stripe h-2 w-full shrink-0 border-b border-border" />
 
           {/* Distance Grid Markers (Auto-Zoom) */}
-          <div className="relative flex flex-1 flex-col overflow-hidden px-6 py-2">
+          <div className="relative flex flex-1 flex-col overflow-hidden px-6 py-3">
             {/* Background Vertical Step Lines */}
-            <div className="pointer-events-none absolute inset-y-0 left-36 right-16">
-              <div className="absolute inset-y-0 left-0 w-1 bg-[#F5F3ED]/30" />
+            <div className="pointer-events-none absolute inset-y-0 left-44 right-16">
+              <div className="absolute inset-y-0 left-0 w-px bg-border-strong" />
               {markers.map((stepVal) => {
                 const pct = Math.min(96, (stepVal / maxScaleSteps) * 88);
                 return (
                   <div
                     key={stepVal}
-                    className="absolute inset-y-0 border-l border-dashed border-[#2E3440]"
+                    className="absolute inset-y-0 border-l border-dashed border-border-strong transition-all duration-500"
                     style={{ left: `${pct}%` }}
                   >
-                    <span className="absolute top-1 -translate-x-1/2 rounded bg-[#1F2329] px-1.5 py-0.5 font-[family-name:var(--font-orbitron)] text-[11px] font-bold text-[#A0A6B2] tabular-nums">
-                      {stepVal}
+                    <span className="absolute top-2 -translate-x-1/2 rounded-[var(--radius-xs)] border border-border bg-surface px-2 py-0.5 font-mono text-xs font-semibold text-muted tabular-nums">
+                      {stepVal}st
                     </span>
                   </div>
                 );
@@ -333,11 +357,12 @@ export default function LiveRaceDisplayPage() {
             {/* Active Lanes */}
             {players.length === 0 ? (
               <div className="my-auto flex flex-col items-center justify-center text-center">
-                <p className="font-[family-name:var(--font-orbitron)] text-2xl font-bold text-[#A0A6B2]">
-                  WAITING FOR RACERS TO JOIN THE GRID
+                <Label index="grid">telemetry standby</Label>
+                <p className="mt-2 font-sans text-3xl font-semibold tracking-[-0.025em] text-foreground">
+                  Waiting for drivers to lock onto the grid.
                 </p>
-                <p className="mt-1 text-sm text-[#A0A6B2]">
-                  Scan the QR code to spawn your vehicle on the track.
+                <p className="mt-1 font-mono text-sm text-muted">
+                  Scan the QR code below or visit {joinUrl}
                 </p>
               </div>
             ) : (
@@ -353,24 +378,24 @@ export default function LiveRaceDisplayPage() {
                   return (
                     <div
                       key={player.id}
-                      className="relative flex items-center border-b border-[#2E3440]/55 last:border-b-0"
+                      className="relative flex items-center border-b border-border/70 last:border-b-0"
                       style={{
                         height: `${Math.max(36, Math.floor(100 / Math.max(8, mainLanePlayers.length)))}%`,
                       }}
                     >
-                      {/* Left Lane Tag (Rank + Name) */}
-                      <div className="z-10 flex w-36 shrink-0 items-center gap-2 pr-2">
+                      {/* Left Lane Tag (Rank + Callsign) */}
+                      <div className="z-10 flex w-44 shrink-0 items-center gap-2.5 pr-3">
                         <span
                           className={cn(
-                            "flex size-6 shrink-0 items-center justify-center rounded-[4px] font-[family-name:var(--font-orbitron)] text-xs font-black tabular-nums",
+                            "flex size-7 shrink-0 items-center justify-center rounded-[var(--radius-xs)] font-mono text-xs font-semibold tabular-nums",
                             player.rank === 1
-                              ? "bg-[#FFD43B] text-[#17191D]"
-                              : "bg-[#282D35] text-[#A0A6B2]",
+                              ? "bg-accent text-accent-fg"
+                              : "border border-border bg-surface text-muted",
                           )}
                         >
-                          {player.rank}
+                          P{player.rank}
                         </span>
-                        <span className="truncate text-sm font-bold text-[#F5F3ED]">
+                        <span className="truncate font-sans text-base font-semibold tracking-tight text-foreground">
                           {player.nickname}
                         </span>
                       </div>
@@ -378,7 +403,7 @@ export default function LiveRaceDisplayPage() {
                       {/* Track Runway */}
                       <div className="relative flex-1 h-full flex items-center pr-16">
                         <div
-                          className="relative flex items-center gap-2 transition-transform duration-500 ease-out will-change-transform"
+                          className="relative flex items-center gap-2.5 transition-all duration-500 ease-out will-change-transform"
                           style={{
                             left: `${pct}%`,
                           }}
@@ -388,11 +413,11 @@ export default function LiveRaceDisplayPage() {
                             carNumber={player.carNumber}
                             size={isCompactLane ? "sm" : "md"}
                           />
-                          <span className="rounded-[4px] bg-[#1F2329]/90 border border-[#2E3440] px-1.5 py-0.5 font-[family-name:var(--font-orbitron)] text-xs font-bold text-[#FFD43B] tabular-nums">
+                          <span className="rounded-[var(--radius-xs)] border border-border bg-surface px-2 py-0.5 font-mono text-sm font-semibold text-foreground tabular-nums">
                             {player.totalSteps}
                           </span>
 
-                          {/* Animated +1 / +2 / +3 Spectator Indicator (D-016) */}
+                          {/* Animated +1 / +2 / +3 Spectator Indicator */}
                           {pop && (
                             <StepGainIndicator
                               key={pop.eventId}
@@ -410,16 +435,16 @@ export default function LiveRaceDisplayPage() {
 
             {/* Compact Field Strip when >20 Racers (D-014) */}
             {fieldStripPlayers.length > 0 && (
-              <div className="relative z-10 mt-1 shrink-0 rounded-[6px] border border-[#2E3440] bg-[#1F2329]/90 px-4 py-2">
-                <div className="mb-1.5 flex items-center justify-between">
-                  <span className="font-[family-name:var(--font-orbitron)] text-[11px] font-bold uppercase tracking-wider text-[#A0A6B2]">
-                    PACK FIELD (P13 – P{players.length})
+              <div className="relative z-10 mt-1 shrink-0 rounded-[var(--radius-sm)] border border-border bg-surface/95 px-4 py-2.5">
+                <div className="mb-1.5 flex items-center justify-between font-mono text-xs">
+                  <span className="text-foreground">
+                    pack field / P13 – P{players.length}
                   </span>
-                  <span className="font-mono text-[11px] text-[#A0A6B2]">
-                    Top 12 shown in full lanes above
+                  <span className="text-muted">
+                    top 12 shown in primary sector lanes
                   </span>
                 </div>
-                <div className="relative h-16 w-full pl-32 pr-16">
+                <div className="relative h-16 w-full pl-36 pr-16">
                   {fieldStripPlayers.map((p, idx) => {
                     const pct =
                       maxScaleSteps > 0
@@ -430,19 +455,17 @@ export default function LiveRaceDisplayPage() {
                     return (
                       <div
                         key={p.id}
-                        className="absolute flex items-center gap-1 rounded-[4px] border border-[#2E3440] bg-[#17191D] px-1.5 py-0.5 transition-all duration-500 ease-out"
+                        className="absolute flex items-center gap-1.5 rounded-[var(--radius-xs)] border bg-subtle px-2 py-0.5 transition-all duration-500 ease-out"
                         style={{
-                          left: `calc(8rem + ${pct * 0.78}%)`,
+                          left: `calc(9rem + ${pct * 0.78}%)`,
                           top: `${rowOffset}px`,
                           borderColor: p.carColor,
                         }}
                       >
-                        <span
-                          className="font-[family-name:var(--font-orbitron)] text-[10px] font-black text-[#F5F3ED] tabular-nums"
-                        >
+                        <span className="font-mono text-[11px] font-semibold text-foreground tabular-nums">
                           #{String(p.carNumber).padStart(2, "0")}
                         </span>
-                        <span className="max-w-[68px] truncate text-[10px] font-medium text-[#A0A6B2]">
+                        <span className="max-w-[76px] truncate font-sans text-xs text-muted">
                           {p.nickname}
                         </span>
                         {pop && (
@@ -461,56 +484,59 @@ export default function LiveRaceDisplayPage() {
           </div>
 
           {/* Bottom Kerb */}
-          <div className="kerb-stripe h-3 w-full shrink-0 border-t border-[#2E3440]" />
+          <div className="kerb-stripe h-2 w-full shrink-0 border-t border-border" />
 
           {/* LOBBY QR JOIN OVERLAY */}
           {effectiveStatus === "LOBBY" && (
-            <div className="absolute inset-x-8 bottom-8 z-20 flex items-center justify-between rounded-[8px] border-2 border-[#00629B] bg-[#1F2329]/95 p-5">
+            <div className="absolute inset-x-6 bottom-6 z-20 flex items-center justify-between rounded-[var(--radius-md)] border border-border-strong bg-surface/95 backdrop-blur-md p-5">
               <div className="flex items-center gap-5">
                 <button
                   type="button"
                   onClick={() => setShowLargeQr(true)}
                   title="Click to enlarge QR code"
-                  className="overflow-hidden rounded-[6px] border-2 border-[#F5F3ED] bg-[#F5F3ED] p-1 transition-transform active:scale-95 cursor-pointer"
+                  className="overflow-hidden rounded-[var(--radius-sm)] border border-border bg-white p-1.5 transition-transform active:scale-95 cursor-pointer"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={`/api/qr?url=${encodeURIComponent(joinUrl)}`}
                     alt="Scan to join race"
-                    className="size-32 block"
+                    className="size-28 block"
                   />
                 </button>
                 <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-block rounded-[4px] bg-[#00629B] px-2.5 py-0.5 font-[family-name:var(--font-orbitron)] text-xs font-bold text-[#F5F3ED]">
-                      SCAN TO JOIN ON YOUR PHONE
-                    </span>
-                    <button
-                      type="button"
+                  <div className="flex items-center gap-2.5">
+                    <Chip tone="accent" dot>
+                      driver registration open
+                    </Chip>
+                    <Button
+                      variant="secondary"
+                      size="xs"
                       onClick={() => setShowLargeQr(true)}
-                      className="inline-flex items-center gap-1.5 rounded-[4px] border border-[#2E3440] bg-[#282D35] px-2.5 py-0.5 text-xs font-semibold text-[#FFD43B] cursor-pointer"
                     >
-                      <QrCode className="size-3.5" />
-                      <span>Enlarge QR</span>
-                    </button>
+                      <QrCode className="size-3.5 text-accent" />
+                      <span>enlarge qr</span>
+                    </Button>
                   </div>
-                  <h2 className="font-[family-name:var(--font-orbitron)] text-2xl font-black text-[#F5F3ED]">
+                  <h2 className="font-mono text-2xl font-semibold tracking-tight text-foreground">
                     {joinUrl}
                   </h2>
-                  <p className="text-sm text-[#A0A6B2]">
-                    Choose Easy (+{race?.easyReward ?? 1}), Medium (+
-                    {race?.mediumReward ?? 2}), or Hard (+{race?.hardReward ?? 3}) questions to advance your car!
+                  <p className="text-sm text-muted">
+                    Scan on your phone to claim a car. Select Easy (+
+                    {race?.easyReward ?? 1}), Medium (+{race?.mediumReward ?? 2}
+                    ), or Hard (+{race?.hardReward ?? 3}) on every question.
                   </p>
                 </div>
               </div>
-              <div className="text-right">
-                <span className="block font-mono text-xs uppercase text-[#A0A6B2]">
-                  GRID READY
+              <div className="border-l border-border pl-6 text-right">
+                <span className="block font-mono text-xs lowercase text-muted">
+                  grid telemetry
                 </span>
-                <span className="font-[family-name:var(--font-orbitron)] text-5xl font-black text-[#FFD43B] tabular-nums">
+                <span className="font-mono text-5xl font-semibold text-accent tabular-nums">
                   {players.length}
                 </span>
-                <span className="block text-xs text-[#A0A6B2]">Cars on track</span>
+                <span className="block font-mono text-xs text-muted">
+                  units locked
+                </span>
               </div>
             </div>
           )}
@@ -519,70 +545,70 @@ export default function LiveRaceDisplayPage() {
           {effectiveStatus === "LOBBY" && showLargeQr && (
             <div
               onClick={() => setShowLargeQr(false)}
-              className="absolute inset-0 z-40 flex items-center justify-center bg-[#17191D]/92 p-8"
+              className="absolute inset-0 z-40 flex items-center justify-center bg-background/92 backdrop-blur-sm p-8"
             >
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="flex max-w-3xl flex-col items-center rounded-[8px] border-2 border-[#00629B] bg-[#1F2329] px-12 py-8 text-center space-y-5"
+                className="flex max-w-2xl flex-col items-center rounded-[var(--radius-md)] border border-border-strong bg-surface px-12 py-8 text-center space-y-5"
               >
-                <div className="flex w-full items-center justify-between gap-8 border-b border-[#2E3440] pb-4">
-                  <span className="rounded-[4px] bg-[#00629B] px-3 py-1 font-[family-name:var(--font-orbitron)] text-sm font-bold text-[#F5F3ED]">
-                    SCAN TO JOIN THE GRID
-                  </span>
-                  <button
-                    type="button"
+                <div className="flex w-full items-center justify-between gap-8 border-b border-border pb-4">
+                  <Label index="qr" tone="accent">
+                    driver onboarding / scan to join
+                  </Label>
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={() => setShowLargeQr(false)}
-                    className="inline-flex items-center gap-1.5 rounded-[6px] border border-[#2E3440] bg-[#282D35] px-3 py-1.5 text-xs font-semibold text-[#F5F3ED] cursor-pointer"
                   >
-                    <X className="size-4" />
-                    <span>Minimize QR</span>
-                  </button>
+                    <X className="size-3.5" />
+                    <span>close</span>
+                  </Button>
                 </div>
 
-                <div className="overflow-hidden rounded-[8px] border-4 border-[#F5F3ED] bg-[#F5F3ED] p-4">
+                <div className="overflow-hidden rounded-[var(--radius-md)] border border-border bg-white p-4">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={`/api/qr?url=${encodeURIComponent(joinUrl)}`}
                     alt="Giant Join QR"
-                    className="size-[420px] block"
+                    className="size-[400px] block"
                   />
                 </div>
 
-                <h2 className="font-[family-name:var(--font-orbitron)] text-3xl font-black text-[#3898EC]">
+                <h2 className="font-mono text-3xl font-semibold text-foreground">
                   {joinUrl}
                 </h2>
-                <p className="font-[family-name:var(--font-orbitron)] text-lg font-bold text-[#FFD43B]">
-                  {players.length} Racers Ready on Starting Grid
+                <p className="font-mono text-base text-accent tabular-nums">
+                  {players.length} drivers locked on starting grid
                 </p>
               </div>
             </div>
           )}
 
-          {/* COUNTDOWN 5-LIGHT GANTRY OVERLAY */}
+          {/* COUNTDOWN GANTRY OVERLAY */}
           {effectiveStatus === "COUNTDOWN" && (
-            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-[#17191D]/85">
-              <div className="rounded-[8px] border-2 border-[#2E3440] bg-[#1F2329] px-10 py-8 text-center">
-                <p className="font-[family-name:var(--font-orbitron)] text-sm font-bold tracking-widest text-[#A0A6B2]">
-                  RACE START SEQUENCE
-                </p>
-                <div className="my-6 flex items-center justify-center gap-5">
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-background/88 backdrop-blur-sm">
+              <div className="rounded-[var(--radius-md)] border border-border-strong bg-surface px-12 py-10 text-center">
+                <Label index="start" tone="accent">
+                  launch sequence active
+                </Label>
+                <div className="my-7 flex items-center justify-center gap-5">
                   {[1, 2, 3, 4].map((light) => {
                     const lit = preStartSeconds <= 4 - light + 1;
                     return (
                       <div
                         key={light}
                         className={cn(
-                          "size-14 rounded-full border-4 transition-colors",
+                          "size-14 rounded-full border-2 transition-colors",
                           lit
-                            ? "border-[#EF4444] bg-[#EF4444]"
-                            : "border-[#2E3440] bg-[#17191D]",
+                            ? "border-danger bg-danger"
+                            : "border-border-strong bg-subtle",
                         )}
                       />
                     );
                   })}
                 </div>
-                <p className="font-[family-name:var(--font-orbitron)] text-8xl font-black text-[#FFD43B] tabular-nums">
-                  {preStartSeconds > 0 ? preStartSeconds : "GO!"}
+                <p className="font-mono text-8xl font-semibold tracking-tight text-foreground tabular-nums">
+                  {preStartSeconds > 0 ? preStartSeconds : "GO"}
                 </p>
               </div>
             </div>
@@ -590,18 +616,18 @@ export default function LiveRaceDisplayPage() {
 
           {/* FINISHED PODIUM CELEBRATION OVERLAY */}
           {effectiveStatus === "FINISHED" && players.length > 0 && (
-            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-[#17191D]/92 p-8">
-              <div className="w-full max-w-4xl rounded-[8px] border-2 border-[#FFD43B] bg-[#1F2329] overflow-hidden">
-                <div className="checkered-stripe h-5 w-full" />
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-background/92 backdrop-blur-sm p-8">
+              <div className="w-full max-w-4xl rounded-[var(--radius-md)] border border-border-strong bg-surface overflow-hidden">
+                <div className="checkered-stripe h-4 w-full border-b border-border" />
                 <div className="p-8 text-center">
-                  <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-[#FFD43B]/20 text-[#FFD43B]">
-                    <Trophy className="size-8" />
+                  <div className="mx-auto flex size-12 items-center justify-center rounded-[var(--radius-sm)] border border-accent/40 bg-accent-subtle text-accent">
+                    <Trophy className="size-6" />
                   </div>
-                  <p className="mt-3 font-mono text-xs uppercase tracking-widest text-[#FFD43B]">
-                    OFFICIAL CLASSIFICATION • {race?.name}
+                  <p className="mt-3 font-mono text-xs lowercase tracking-[0.04em] text-accent">
+                    official classification / {race?.name}
                   </p>
-                  <h2 className="mt-1 font-[family-name:var(--font-orbitron)] text-4xl font-black text-[#F5F3ED]">
-                    WINNER: {players[0].nickname}
+                  <h2 className="mt-1 font-sans text-4xl font-semibold tracking-[-0.03em] text-foreground">
+                    P1 — {players[0].nickname}
                   </h2>
 
                   {/* Top 3 Podium Cards */}
@@ -610,40 +636,31 @@ export default function LiveRaceDisplayPage() {
                       <div
                         key={p.id}
                         className={cn(
-                          "rounded-[8px] border p-5",
+                          "rounded-[var(--radius-md)] border p-5",
                           idx === 0
-                            ? "border-2 border-[#FFD43B] bg-[#17191D]"
-                            : "border-[#2E3440] bg-[#17191D]/80",
+                            ? "border-accent bg-accent-subtle/40"
+                            : "border-border bg-subtle",
                         )}
                       >
                         <div className="flex items-center justify-between">
-                          <span
-                            className={cn(
-                              "rounded-[4px] px-2.5 py-1 font-[family-name:var(--font-orbitron)] text-sm font-black",
-                              idx === 0
-                                ? "bg-[#FFD43B] text-[#17191D]"
-                                : idx === 1
-                                  ? "bg-[#F5F3ED] text-[#17191D]"
-                                  : "bg-[#F97316] text-[#17191D]",
-                            )}
-                          >
+                          <Chip tone={idx === 0 ? "accent" : "strong"}>
                             P{idx + 1}
-                          </span>
+                          </Chip>
                           <RaceCarSvg
                             color={p.carColor}
                             carNumber={p.carNumber}
                             size="sm"
                           />
                         </div>
-                        <p className="mt-3 truncate font-[family-name:var(--font-orbitron)] text-xl font-bold text-[#F5F3ED]">
+                        <p className="mt-3 truncate font-sans text-xl font-semibold text-foreground">
                           {p.nickname}
                         </p>
-                        <div className="mt-3 flex items-baseline justify-between border-t border-[#2E3440] pt-2.5">
-                          <span className="font-[family-name:var(--font-orbitron)] text-2xl font-black text-[#FFD43B] tabular-nums">
-                            {p.totalSteps} STEPS
+                        <div className="mt-3 flex items-baseline justify-between border-t border-border pt-2.5 font-mono tabular-nums">
+                          <span className="text-2xl font-semibold text-accent">
+                            {p.totalSteps} st
                           </span>
-                          <span className="font-mono text-xs text-[#22C55E]">
-                            {p.correctCount} correct
+                          <span className="text-xs text-ok">
+                            {p.correctCount} hit
                           </span>
                         </div>
                       </div>
@@ -655,78 +672,83 @@ export default function LiveRaceDisplayPage() {
           )}
         </section>
 
-        {/* RIGHT: Live Broadcast Leaderboard (Timing Tower) */}
-        <aside className="flex h-full flex-col border-l-2 border-[#2E3440] bg-[#1F2329]">
-          <div className="flex items-center justify-between border-b border-[#2E3440] bg-[#17191D] px-4 py-3">
-            <span className="font-[family-name:var(--font-orbitron)] text-sm font-bold tracking-wider text-[#F5F3ED]">
-              LIVE TIMING TOWER
-            </span>
-            <span className="font-mono text-[11px] text-[#A0A6B2]">
-              STEPS • CORRECT
+        {/* RIGHT: Live Broadcast Leaderboard (Timing Tower with FLIP Reordering) */}
+        <aside className="flex h-full flex-col border-l border-border bg-surface">
+          <div className="flex items-center justify-between border-b border-border bg-subtle px-5 py-3">
+            <Label index="tower" tone="accent" dot>
+              live timing
+            </Label>
+            <span className="font-mono text-[11px] lowercase text-muted">
+              hit · steps · gap
             </span>
           </div>
 
-          <div className="flex-1 divide-y divide-[#2E3440]/60 overflow-hidden">
-            {players.slice(0, 18).map((p) => (
-              <div
-                key={p.id}
-                className={cn(
-                  "flex items-center justify-between px-4 py-2.5",
-                  p.rank === 1 && p.totalSteps > 0
-                    ? "border-l-4 border-l-[#FFD43B] bg-[#FFD43B]/10"
-                    : "",
-                )}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span
-                    className={cn(
-                      "flex w-7 shrink-0 items-center justify-center rounded-[4px] py-0.5 font-[family-name:var(--font-orbitron)] text-xs font-bold tabular-nums",
-                      p.rank === 1
-                        ? "bg-[#FFD43B] text-[#17191D]"
-                        : "bg-[#282D35] text-[#A0A6B2]",
-                    )}
-                  >
-                    {p.rank}
-                  </span>
-                  <span
-                    className="shrink-0 rounded-[4px] px-1.5 py-0.5 font-[family-name:var(--font-orbitron)] text-[11px] font-bold text-[#17191D] tabular-nums"
-                    style={{ backgroundColor: p.carColor }}
-                  >
-                    #{String(p.carNumber).padStart(2, "0")}
-                  </span>
-                  <span className="truncate text-sm font-semibold text-[#F5F3ED]">
-                    {p.nickname}
-                  </span>
-                </div>
+          <div className="flex-1 divide-y divide-border overflow-hidden">
+            {players.slice(0, 18).map((p, idx) => {
+              const gap =
+                idx === 0
+                  ? "INTERVAL"
+                  : `-${Math.max(0, leaderSteps - p.totalSteps)}`;
+              return (
+                <motion.div
+                  layout
+                  transition={{
+                    type: "spring",
+                    stiffness: 420,
+                    damping: 36,
+                  }}
+                  key={p.id}
+                  className={cn(
+                    "flex items-center justify-between px-5 py-3",
+                    p.rank === 1 && p.totalSteps > 0
+                      ? "border-l-2 border-l-accent bg-accent-subtle/30"
+                      : "",
+                  )}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span
+                      className={cn(
+                        "flex w-7 shrink-0 items-center justify-center rounded-[var(--radius-xs)] py-0.5 font-mono text-xs font-semibold tabular-nums",
+                        p.rank === 1
+                          ? "bg-accent text-accent-fg"
+                          : "border border-border bg-elevated text-muted",
+                      )}
+                    >
+                      {p.rank}
+                    </span>
+                    <span
+                      className="shrink-0 rounded-[var(--radius-xs)] px-1.5 py-0.5 font-mono text-xs font-semibold text-[#0A0B0D] tabular-nums"
+                      style={{ backgroundColor: p.carColor }}
+                    >
+                      #{String(p.carNumber).padStart(2, "0")}
+                    </span>
+                    <span className="truncate font-sans text-base font-medium text-foreground">
+                      {p.nickname}
+                    </span>
+                  </div>
 
-                <div className="flex shrink-0 items-center gap-3">
-                  <span className="font-mono text-xs text-[#22C55E] tabular-nums">
-                    {p.correctCount}✓
-                  </span>
-                  <span className="w-10 text-right font-[family-name:var(--font-orbitron)] text-base font-black text-[#FFD43B] tabular-nums">
-                    {p.totalSteps}
-                  </span>
-                </div>
-              </div>
-            ))}
+                  <div className="flex shrink-0 items-center gap-3 font-mono tabular-nums">
+                    <span className="text-xs text-ok">{p.correctCount}✓</span>
+                    <span className="w-10 text-right text-lg font-semibold text-foreground">
+                      {p.totalSteps}
+                    </span>
+                    <span className="w-14 text-right text-xs text-muted">
+                      {gap}
+                    </span>
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
 
-          {/* Spectator Legend Footer */}
-          <div className="border-t border-[#2E3440] bg-[#17191D] px-4 py-2.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-mono text-[11px] uppercase text-[#A0A6B2]">
-                STEP REWARDS:
-              </span>
-              <div className="flex items-center gap-2 font-[family-name:var(--font-orbitron)] text-[11px] font-bold">
-                <span className="rounded bg-[#22C55E]/20 px-2 py-0.5 text-[#22C55E]">
-                  +{race?.easyReward ?? 1} EASY
-                </span>
-                <span className="rounded bg-[#3898EC]/20 px-2 py-0.5 text-[#3898EC]">
-                  +{race?.mediumReward ?? 2} MED
-                </span>
-                <span className="rounded bg-[#FFD43B]/20 px-2 py-0.5 text-[#FFD43B]">
-                  +{race?.hardReward ?? 3} HARD
-                </span>
+          {/* Spectator Telemetry Legend Footer */}
+          <div className="border-t border-border bg-subtle px-5 py-3">
+            <div className="flex items-center justify-between font-mono text-xs tabular-nums">
+              <span className="text-muted">gear delta</span>
+              <div className="flex items-center gap-2">
+                <Chip tone="ok">+{race?.easyReward ?? 1} easy</Chip>
+                <Chip tone="strong">+{race?.mediumReward ?? 2} med</Chip>
+                <Chip tone="accent">+{race?.hardReward ?? 3} hard</Chip>
               </div>
             </div>
           </div>
@@ -737,7 +759,7 @@ export default function LiveRaceDisplayPage() {
 }
 
 /**
- * Animated +1 (Green) / +2 (Blue) / +3 (Gold) pop indicator above a player's car (Decision D-016)
+ * Animated +1 / +2 / +3 pop indicator above a player's car (Decision D-016)
  */
 function StepGainIndicator({
   delta,
@@ -747,21 +769,20 @@ function StepGainIndicator({
   difficulty: Difficulty;
 }) {
   const styleByDifficulty = {
-    EASY: "border-[#22C55E] bg-[#22C55E] text-[#17191D] text-xs px-2 py-0.5",
+    EASY: "border border-ok bg-ok text-[#0A0B0D] text-xs px-2 py-0.5",
     MEDIUM:
-      "border-[#3898EC] bg-[#3898EC] text-[#17191D] text-sm px-2.5 py-0.5 scale-110",
-    HARD: "border-2 border-[#F5F3ED] bg-[#FFD43B] text-[#17191D] text-base px-3 py-1 scale-125",
+      "border border-border-strong bg-foreground text-background text-sm px-2.5 py-0.5 scale-105",
+    HARD: "border border-accent bg-accent text-accent-fg text-base px-3 py-1 scale-115",
   }[difficulty];
 
   return (
     <div
       className={cn(
-        "animate-step-pop pointer-events-none absolute -top-7 left-6 z-30 rounded-[4px] font-[family-name:var(--font-orbitron)] font-black tracking-tight tabular-nums",
+        "animate-step-pop pointer-events-none absolute -top-7 left-6 z-30 rounded-[var(--radius-xs)] font-mono font-bold tracking-tight tabular-nums",
         styleByDifficulty,
       )}
     >
       +{delta}
-      {difficulty === "HARD" ? "⚡" : ""}
     </div>
   );
 }

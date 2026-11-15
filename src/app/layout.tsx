@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Orbitron } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -12,15 +12,10 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const orbitron = Orbitron({
-  variable: "--font-orbitron",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
-  title: "IEEE Grand Prix — Strategic Web Dev Racing Quiz",
+  title: "IEEE Grand Prix — Pit Wall Telemetry & Live Racing Quiz",
   description:
-    "Live multiplayer strategic racing quiz powered by server-authoritative timing.",
+    "Ship answers at race pace. Real-time web engineering grand prix powered by an authoritative server clock.",
 };
 
 export default function RootLayout({
@@ -29,9 +24,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${orbitron.variable} font-sans min-h-screen bg-[#17191D] text-[#F5F3ED] antialiased selection:bg-[#FFD43B] selection:text-[#17191D]`}
+        className={`${geistSans.variable} ${geistMono.variable} font-sans min-h-screen bg-background text-foreground antialiased selection:bg-accent selection:text-accent-fg`}
       >
         {children}
       </body>
