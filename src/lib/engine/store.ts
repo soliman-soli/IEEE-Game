@@ -103,13 +103,38 @@ const globalForStore = globalThis as unknown as {
   __ieeeSupabase?: SupabaseClient | null;
 };
 
+function cleanEnv(val: string | undefined, keyName: string): string {
+  if (!val) return "";
+  let cleaned = val.trim();
+  if (cleaned.startsWith(`${keyName}=`)) {
+    cleaned = cleaned.slice(keyName.length + 1).trim();
+  }
+  if (
+    (cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+    (cleaned.startsWith("'") && cleaned.endsWith("'"))
+  ) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
+  return cleaned;
+}
+
 export function getSupabaseAdmin(): SupabaseClient | null {
   if (globalForStore.__ieeeSupabase !== undefined) {
     return globalForStore.__ieeeSupabase;
   }
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = cleanEnv(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    "NEXT_PUBLIC_SUPABASE_URL",
+  );
   const serviceKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    cleanEnv(
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      "SUPABASE_SERVICE_ROLE_KEY",
+    ) ||
+    cleanEnv(
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    );
   if (url && serviceKey) {
     globalForStore.__ieeeSupabase = createClient(url, serviceKey, {
       auth: { persistSession: false, autoRefreshToken: false },

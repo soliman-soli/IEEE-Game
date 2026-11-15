@@ -30,6 +30,10 @@ loadDotEnvLocal();
 import { getPublicRaceSnapshot } from "../src/lib/engine/store";
 
 async function main() {
+  const adminPwd = process.env.ADMIN_PASSWORD || "";
+  console.log(
+    `Admin password check -> Configured in .env.local: ${Boolean(adminPwd)}, Matches default ("ieee-race-2026"): ${adminPwd.trim() === "ieee-race-2026"}, Length: ${adminPwd.trim().length}`,
+  );
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
   const serviceKey =
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
