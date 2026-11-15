@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   AlertTriangle,
@@ -48,6 +48,10 @@ export default function PlayerPage() {
     stepsEarned: number;
   } | null>(null);
 
+  const mutationEpochRef = useRef(0);
+  const busyRef = useRef(false);
+  const pollInFlightRef = useRef(false);
+
   // Load saved token on mount
   useEffect(() => {
     const saved = window.localStorage.getItem(TOKEN_STORAGE_KEY) || "";
@@ -55,12 +59,19 @@ export default function PlayerPage() {
   }, []);
 
   const fetchPlayerState = useCallback(async (currentToken: string) => {
+    if (busyRef.current || pollInFlightRef.current) return;
+    pollInFlightRef.current = true;
+    const epochAtStart = mutationEpochRef.current;
     try {
       const res = await fetch("/api/player/me", {
         headers: currentToken ? { "x-player-token": currentToken } : {},
         cache: "no-store",
       });
+      if (!res.ok) return;
       const data = await res.json();
+      // Ignore stale poll if a user action occurred while this poll was in flight
+      if (mutationEpochRef.current !== epochAtStart || busyRef.current) return;
+
       if (data.serverTime) {
         updateOffsetFromServerIso(data.serverTime);
       }
@@ -75,6 +86,7 @@ export default function PlayerPage() {
     } catch {
       // Keep last known state on transient venue Wi-Fi drop
     } finally {
+      pollInFlightRef.current = false;
       setLoading(false);
     }
   }, []);
@@ -109,6 +121,8 @@ export default function PlayerPage() {
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault();
     setErrorMsg(null);
+    mutationEpochRef.current += 1;
+    busyRef.current = true;
     setBusyAction(true);
     try {
       const res = await fetch("/api/player/join", {
@@ -123,9 +137,11 @@ export default function PlayerPage() {
       window.localStorage.setItem(TOKEN_STORAGE_KEY, data.playerToken);
       setToken(data.playerToken);
       setView(data.view);
+      setPublicRace(data.view.race);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Could not join race.");
     } finally {
+      busyRef.current = false;
       setBusyAction(false);
     }
   }
@@ -133,6 +149,8 @@ export default function PlayerPage() {
   async function handlePickDifficulty(difficulty: Difficulty) {
     if (!token || busyAction || isLockedOut) return;
     setErrorMsg(null);
+    mutationEpochRef.current += 1;
+    busyRef.current = true;
     setBusyAction(true);
     setSelectedOption(null);
     try {
@@ -146,9 +164,11 @@ export default function PlayerPage() {
         throw new Error(data.error || "Could not load question.");
       }
       setView(data.view);
+      setPublicRace(data.view.race);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Could not load question.");
     } finally {
+      busyRef.current = false;
       setBusyAction(false);
     }
   }
@@ -156,6 +176,8 @@ export default function PlayerPage() {
   async function handleSubmitAnswer() {
     if (!token || !view?.activeAttempt || selectedOption === null || busyAction) return;
     setErrorMsg(null);
+    mutationEpochRef.current += 1;
+    busyRef.current = true;
     setBusyAction(true);
     try {
       const res = await fetch("/api/player/submit", {
@@ -173,6 +195,7 @@ export default function PlayerPage() {
       }
       setSelectedOption(null);
       setView(data.view);
+      setPublicRace(data.view.race);
 
       if (data.outcome === "CORRECT") {
         triggerHaptic(80);
@@ -190,6 +213,7 @@ export default function PlayerPage() {
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to submit answer.");
     } finally {
+      busyRef.current = false;
       setBusyAction(false);
     }
   }
@@ -197,6 +221,8 @@ export default function PlayerPage() {
   async function handleAbandonQuestion() {
     if (!token || !view?.activeAttempt || busyAction) return;
     setErrorMsg(null);
+    mutationEpochRef.current += 1;
+    busyRef.current = true;
     setBusyAction(true);
     try {
       const res = await fetch("/api/player/abandon", {
@@ -213,14 +239,16 @@ export default function PlayerPage() {
       }
       setSelectedOption(null);
       setView(data.view);
+      setPublicRace(data.view.race);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Could not abandon question.");
     } finally {
+      busyRef.current = false;
       setBusyAction(false);
     }
   }
 
-  // Derive live status taking client clock sync into account
+  // Derive live status taking client clock sync into account (monotonic during RACING)
   const effectiveStatus = (() => {
     if (!activeRace) return "LOBBY";
     if (activeRace.status === "LOBBY" || activeRace.status === "FINISHED") {
@@ -230,6 +258,7 @@ export default function PlayerPage() {
     const eMs = activeRace.endsAt ? new Date(activeRace.endsAt).getTime() : null;
     const currentServerMs = getServerNowMs();
     if (eMs && currentServerMs >= eMs) return "FINISHED";
+    if (activeRace.status === "RACING") return "RACING";
     if (sMs && currentServerMs >= sMs) return "RACING";
     return "COUNTDOWN";
   })();

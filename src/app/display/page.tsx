@@ -32,6 +32,7 @@ export default function LiveRaceDisplayPage() {
   const prevLeaderIdRef = useRef<string | null>(null);
   const prevStatusRef = useRef<string | null>(null);
   const prevPreStartSecRef = useRef<number | null>(null);
+  const pollInFlightRef = useRef(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -40,6 +41,8 @@ export default function LiveRaceDisplayPage() {
   }, []);
 
   const fetchSnapshot = useCallback(async () => {
+    if (pollInFlightRef.current) return;
+    pollInFlightRef.current = true;
     try {
       const res = await fetch("/api/race/state", { cache: "no-store" });
       if (!res.ok) return;
@@ -100,6 +103,8 @@ export default function LiveRaceDisplayPage() {
       setSnapshot(data);
     } catch {
       // Resilient to brief network hiccups
+    } finally {
+      pollInFlightRef.current = false;
     }
   }, []);
 
@@ -107,7 +112,7 @@ export default function LiveRaceDisplayPage() {
     void fetchSnapshot();
     const id = setInterval(() => {
       void fetchSnapshot();
-    }, 350);
+    }, 650);
     return () => clearInterval(id);
   }, [fetchSnapshot]);
 
@@ -147,6 +152,7 @@ export default function LiveRaceDisplayPage() {
     const eMs = race.endsAt ? new Date(race.endsAt).getTime() : null;
     const nowServer = getServerNowMs();
     if (eMs && nowServer >= eMs) return "FINISHED";
+    if (race.status === "RACING") return "RACING";
     if (sMs && nowServer >= sMs) return "RACING";
     return "COUNTDOWN";
   })();

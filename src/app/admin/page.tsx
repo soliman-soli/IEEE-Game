@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   CheckCircle2,
@@ -62,6 +62,8 @@ export default function AdminPortalPage() {
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
+  const pollInFlightRef = useRef(false);
 
   // Destructive action confirmation key
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
@@ -121,6 +123,10 @@ export default function AdminPortalPage() {
 
   const fetchDashboard = useCallback(
     async (initializeForm = false) => {
+      if (!initializeForm && (busyRef.current || pollInFlightRef.current)) {
+        return;
+      }
+      pollInFlightRef.current = true;
       try {
         const res = await fetch("/api/admin/race", { cache: "no-store" });
         if (res.status === 401) {
@@ -130,6 +136,9 @@ export default function AdminPortalPage() {
         if (!res.ok) return;
         const payload = (await res.json()) as AdminPayload;
         setAuthed(true);
+        if (!initializeForm && busyRef.current) {
+          return;
+        }
         updateOffsetFromServerIso(payload.serverTime);
         setData((prev) => {
           if (initializeForm || !prev || prev.race.id !== payload.race.id) {
@@ -139,6 +148,8 @@ export default function AdminPortalPage() {
         });
       } catch {
         // Ignore transient network errors
+      } finally {
+        pollInFlightRef.current = false;
       }
     },
     [syncFormFromRace],
@@ -194,6 +205,7 @@ export default function AdminPortalPage() {
     action: "start" | "end" | "reset" | "new-round" | "config",
     extra?: Record<string, unknown>,
   ) {
+    busyRef.current = true;
     setBusy(true);
     setErrorMsg(null);
     setActionMsg(null);
@@ -224,6 +236,7 @@ export default function AdminPortalPage() {
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Operation failed.");
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   }

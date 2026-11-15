@@ -164,7 +164,11 @@ async function broadcastRealtimeEvent(
 // SUPABASE POSTGRES ROW MAPPERS & SYNC HELPERS
 // ============================================================================
 
-async function syncRaceToSupabase(race: Race, isActive = true) {
+async function syncRaceToSupabase(
+  race: Race,
+  isActive = true,
+  syncPoolRows = false,
+) {
   const sb = getSupabaseAdmin();
   if (!sb) return;
   try {
@@ -186,27 +190,29 @@ async function syncRaceToSupabase(race: Race, isActive = true) {
       created_at: race.createdAt,
     });
 
-    const poolRows = [
-      ...race.questionPoolIds.EASY.map((qId) => ({
-        race_id: race.id,
-        question_id: qId,
-        difficulty: "EASY",
-      })),
-      ...race.questionPoolIds.MEDIUM.map((qId) => ({
-        race_id: race.id,
-        question_id: qId,
-        difficulty: "MEDIUM",
-      })),
-      ...race.questionPoolIds.HARD.map((qId) => ({
-        race_id: race.id,
-        question_id: qId,
-        difficulty: "HARD",
-      })),
-    ];
+    if (syncPoolRows) {
+      const poolRows = [
+        ...race.questionPoolIds.EASY.map((qId) => ({
+          race_id: race.id,
+          question_id: qId,
+          difficulty: "EASY",
+        })),
+        ...race.questionPoolIds.MEDIUM.map((qId) => ({
+          race_id: race.id,
+          question_id: qId,
+          difficulty: "MEDIUM",
+        })),
+        ...race.questionPoolIds.HARD.map((qId) => ({
+          race_id: race.id,
+          question_id: qId,
+          difficulty: "HARD",
+        })),
+      ];
 
-    await sb.from("race_questions").delete().eq("race_id", race.id);
-    if (poolRows.length > 0) {
-      await sb.from("race_questions").insert(poolRows);
+      await sb.from("race_questions").delete().eq("race_id", race.id);
+      if (poolRows.length > 0) {
+        await sb.from("race_questions").insert(poolRows);
+      }
     }
   } catch {
     // Keep local store working even if network blips
@@ -283,114 +289,131 @@ async function syncQuestionsToSupabase(questions: Question[]) {
 }
 
 async function hydrateOrSeedSupabase(store: StoreData) {
-  if (store.hydratedFromSupabase) return;
-  store.hydratedFromSupabase = true;
   const sb = getSupabaseAdmin();
   if (!sb) return;
 
   try {
-    // 1. Check if questions exist in Supabase
-    const { data: dbQuestions } = await sb.from("questions").select("*");
-    if (!dbQuestions || dbQuestions.length === 0) {
-      await syncQuestionsToSupabase(store.questions);
-    } else {
-      store.questions = dbQuestions.map((row) => ({
-        id: String(row.id),
-        difficulty: row.difficulty as Difficulty,
-        category: row.category as Question["category"],
-        prompt: String(row.prompt),
-        codeSnippet: row.code_snippet ? String(row.code_snippet) : null,
-        options: row.options as [string, string, string, string],
-        correctIndex: Number(row.correct_index) as 0 | 1 | 2 | 3,
-        enabled: Boolean(row.enabled),
+    // 1. Load static questions once per serverless instance (or seed if empty)
+    if (!store.hydratedFromSupabase) {
+      const { data: dbQuestions } = await sb.from("questions").select("*");
+      if (!dbQuestions || dbQuestions.length === 0) {
+        await syncQuestionsToSupabase(store.questions);
+      } else {
+        store.questions = dbQuestions.map((row) => ({
+          id: String(row.id),
+          difficulty: row.difficulty as Difficulty,
+          category: row.category as Question["category"],
+          prompt: String(row.prompt),
+          codeSnippet: row.code_snippet ? String(row.code_snippet) : null,
+          options: row.options as [string, string, string, string],
+          correctIndex: Number(row.correct_index) as 0 | 1 | 2 | 3,
+          enabled: Boolean(row.enabled),
+        }));
+      }
+      store.hydratedFromSupabase = true;
+    }
+
+    // 2. Always fetch live races, pool, players, and attempts in parallel so all Vercel serverless instances stay 100% synchronized
+    const [racesRes, poolRes, playersRes, attemptsRes] = await Promise.all([
+      sb.from("races").select("*").order("created_at", { ascending: true }),
+      sb.from("race_questions").select("*"),
+      sb.from("players").select("*"),
+      sb.from("attempts").select("*"),
+    ]);
+
+    const dbRaces = racesRes.data;
+    if (!dbRaces || dbRaces.length === 0) {
+      const activeRace = getActiveRace(store);
+      await syncRaceToSupabase(activeRace, true, true);
+      return;
+    }
+
+    const dbPool = poolRes.data ?? [];
+    const loadedRaces: Race[] = dbRaces.map((r) => {
+      const rPool = dbPool.filter((p) => p.race_id === r.id);
+      const poolIds = {
+        EASY: rPool.filter((p) => p.difficulty === "EASY").map((p) => String(p.question_id)),
+        MEDIUM: rPool.filter((p) => p.difficulty === "MEDIUM").map((p) => String(p.question_id)),
+        HARD: rPool.filter((p) => p.difficulty === "HARD").map((p) => String(p.question_id)),
+      };
+      const cfg = {
+        name: String(r.name),
+        durationSec: Number(r.duration_sec),
+        easyCount: Number(r.easy_count),
+        mediumCount: Number(r.medium_count),
+        hardCount: Number(r.hard_count),
+        easyReward: Number(r.easy_reward),
+        mediumReward: Number(r.medium_reward),
+        hardReward: Number(r.hard_reward),
+        allowAbandon: Boolean(r.allow_abandon),
+      };
+      const hasPool =
+        poolIds.EASY.length + poolIds.MEDIUM.length + poolIds.HARD.length > 0;
+      return {
+        id: String(r.id),
+        ...cfg,
+        status: r.status as Race["status"],
+        startsAt: r.starts_at ? String(r.starts_at) : null,
+        endsAt: r.ends_at ? String(r.ends_at) : null,
+        createdAt: String(r.created_at),
+        questionPoolIds: hasPool ? poolIds : buildQuestionPool(store.questions, cfg),
+      };
+    });
+
+    store.races = loadedRaces;
+    const activeRow =
+      [...dbRaces].reverse().find((r) => r.is_active) ??
+      dbRaces[dbRaces.length - 1];
+    store.activeRaceId = String(activeRow.id);
+
+    if (playersRes.data) {
+      store.players = playersRes.data.map((p) => ({
+        id: String(p.id),
+        raceId: String(p.race_id),
+        nickname: String(p.nickname),
+        carNumber: Number(p.car_number),
+        carColor: String(p.car_color),
+        tokenHash: String(p.token_hash),
+        totalSteps: Number(p.total_steps),
+        correctCount: Number(p.correct_count),
+        wrongCount: Number(p.wrong_count),
+        abandonedCount: Number(p.abandoned_count),
+        lastScoreAt: p.last_score_at ? String(p.last_score_at) : null,
+        lockoutUntil: p.lockout_until ? String(p.lockout_until) : null,
+        lastStepDelta: p.last_step_delta !== null ? Number(p.last_step_delta) : null,
+        lastStepDifficulty: (p.last_step_difficulty as Difficulty) ?? null,
+        lastStepEventId: p.last_step_event_id ? String(p.last_step_event_id) : null,
+        joinedAt: String(p.joined_at),
       }));
     }
 
-    // 2. Check if active race exists in Supabase
-    const { data: dbRaces } = await sb
-      .from("races")
-      .select("*")
-      .order("created_at", { ascending: true });
-
-    if (!dbRaces || dbRaces.length === 0) {
-      const activeRace = getActiveRace(store);
-      await syncRaceToSupabase(activeRace, true);
-    } else {
-      const { data: dbPool } = await sb.from("race_questions").select("*");
-      const loadedRaces: Race[] = dbRaces.map((r) => {
-        const rPool = (dbPool ?? []).filter((p) => p.race_id === r.id);
-        const poolIds = {
-          EASY: rPool.filter((p) => p.difficulty === "EASY").map((p) => String(p.question_id)),
-          MEDIUM: rPool.filter((p) => p.difficulty === "MEDIUM").map((p) => String(p.question_id)),
-          HARD: rPool.filter((p) => p.difficulty === "HARD").map((p) => String(p.question_id)),
-        };
-        const cfg = {
-          name: String(r.name),
-          durationSec: Number(r.duration_sec),
-          easyCount: Number(r.easy_count),
-          mediumCount: Number(r.medium_count),
-          hardCount: Number(r.hard_count),
-          easyReward: Number(r.easy_reward),
-          mediumReward: Number(r.medium_reward),
-          hardReward: Number(r.hard_reward),
-          allowAbandon: Boolean(r.allow_abandon),
-        };
-        const hasPool =
-          poolIds.EASY.length + poolIds.MEDIUM.length + poolIds.HARD.length > 0;
-        return {
-          id: String(r.id),
-          ...cfg,
-          status: r.status as Race["status"],
-          startsAt: r.starts_at ? String(r.starts_at) : null,
-          endsAt: r.ends_at ? String(r.ends_at) : null,
-          createdAt: String(r.created_at),
-          questionPoolIds: hasPool ? poolIds : buildQuestionPool(store.questions, cfg),
-        };
-      });
-      store.races = loadedRaces;
-      const activeRow = dbRaces.find((r) => r.is_active) ?? dbRaces[dbRaces.length - 1];
-      store.activeRaceId = String(activeRow.id);
-
-      // 3. Load players and attempts for active race
-      const { data: dbPlayers } = await sb.from("players").select("*");
-      if (dbPlayers) {
-        store.players = dbPlayers.map((p) => ({
-          id: String(p.id),
-          raceId: String(p.race_id),
-          nickname: String(p.nickname),
-          carNumber: Number(p.car_number),
-          carColor: String(p.car_color),
-          tokenHash: String(p.token_hash),
-          totalSteps: Number(p.total_steps),
-          correctCount: Number(p.correct_count),
-          wrongCount: Number(p.wrong_count),
-          abandonedCount: Number(p.abandoned_count),
-          lastScoreAt: p.last_score_at ? String(p.last_score_at) : null,
-          lockoutUntil: p.lockout_until ? String(p.lockout_until) : null,
-          lastStepDelta: p.last_step_delta !== null ? Number(p.last_step_delta) : null,
-          lastStepDifficulty: (p.last_step_difficulty as Difficulty) ?? null,
-          lastStepEventId: p.last_step_event_id ? String(p.last_step_event_id) : null,
-          joinedAt: String(p.joined_at),
-        }));
-      }
-
-      const { data: dbAttempts } = await sb.from("attempts").select("*");
-      if (dbAttempts) {
-        store.attempts = dbAttempts.map((a) => ({
-          id: String(a.id),
-          raceId: String(a.race_id),
-          playerId: String(a.player_id),
-          questionId: String(a.question_id),
-          difficulty: a.difficulty as Difficulty,
-          status: a.status as Attempt["status"],
-          selectedIndex: a.selected_index !== null ? Number(a.selected_index) : null,
-          stepsAwarded: Number(a.steps_awarded),
-          createdAt: String(a.created_at),
-          resolvedAt: a.resolved_at ? String(a.resolved_at) : null,
-        }));
-      }
-      persistStoreToDisk(store);
+    if (attemptsRes.data) {
+      store.attempts = attemptsRes.data.map((a) => ({
+        id: String(a.id),
+        raceId: String(a.race_id),
+        playerId: String(a.player_id),
+        questionId: String(a.question_id),
+        difficulty: a.difficulty as Difficulty,
+        status: a.status as Attempt["status"],
+        selectedIndex: a.selected_index !== null ? Number(a.selected_index) : null,
+        stepsAwarded: Number(a.steps_awarded),
+        createdAt: String(a.created_at),
+        resolvedAt: a.resolved_at ? String(a.resolved_at) : null,
+      }));
     }
+
+    // Reconstruct archived round history from previous rounds
+    store.history = loadedRaces
+      .filter((r) => r.id !== store.activeRaceId || r.status === "FINISHED")
+      .map((r) => ({
+        race: omitPool(r),
+        standings: rankPlayers(store.players.filter((p) => p.raceId === r.id)),
+        archivedAt: r.endsAt ?? r.createdAt,
+      }))
+      .filter((h) => h.standings.length > 0)
+      .reverse();
+
+    persistStoreToDisk(store);
   } catch {
     // Fall back gracefully if offline
   }
@@ -975,7 +998,7 @@ export async function updateRaceConfig(patch: Partial<RaceConfig>): Promise<Race
 
     race.questionPoolIds = buildQuestionPool(store.questions, race);
     persistStoreToDisk(store);
-    await syncRaceToSupabase(race, true);
+    await syncRaceToSupabase(race, true, true);
     return race;
   });
 }
@@ -987,7 +1010,14 @@ export async function startRace(): Promise<Race> {
       throw new Error("Race can only be started from the LOBBY state.");
     }
 
-    race.questionPoolIds = buildQuestionPool(store.questions, race);
+    const hasPool =
+      race.questionPoolIds.EASY.length +
+        race.questionPoolIds.MEDIUM.length +
+        race.questionPoolIds.HARD.length >
+      0;
+    if (!hasPool) {
+      race.questionPoolIds = buildQuestionPool(store.questions, race);
+    }
     const nowMs = Date.now();
     const startsMs = nowMs + START_COUNTDOWN_MS;
     const endsMs = startsMs + race.durationSec * 1000;
@@ -997,7 +1027,7 @@ export async function startRace(): Promise<Race> {
     race.endsAt = new Date(endsMs).toISOString();
 
     persistStoreToDisk(store);
-    await syncRaceToSupabase(race, true);
+    await syncRaceToSupabase(race, true, !hasPool);
     await broadcastRealtimeEvent("race-state", "race-started", {
       raceId: race.id,
       status: race.status,
@@ -1076,7 +1106,7 @@ export async function resetCurrentRace(): Promise<Race> {
         // Ignore
       }
     }
-    await syncRaceToSupabase(race, true);
+    await syncRaceToSupabase(race, true, true);
 
     await broadcastRealtimeEvent("race-state", "race-reset", {
       raceId: race.id,
@@ -1095,7 +1125,7 @@ export async function createNewRound(customName?: string): Promise<Race> {
     ) {
       archiveRaceIfNeeded(store, prevRace);
     }
-    await syncRaceToSupabase(prevRace, false);
+    await syncRaceToSupabase(prevRace, false, false);
 
     const roundNumber = store.races.length + 1;
     const nextName = customName?.trim() || `Round ${roundNumber}`;
@@ -1104,7 +1134,7 @@ export async function createNewRound(customName?: string): Promise<Race> {
     store.races.push(newRace);
     store.activeRaceId = newRace.id;
     persistStoreToDisk(store);
-    await syncRaceToSupabase(newRace, true);
+    await syncRaceToSupabase(newRace, true, true);
 
     await broadcastRealtimeEvent("race-state", "new-round", {
       raceId: newRace.id,
