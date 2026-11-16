@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @theme inline {
+  --font-display: var(--font-display), -apple-system, BlinkMacSystemFont, sans-serif;
   --font-sans: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 
@@ -26,43 +27,48 @@
   --color-danger: var(--danger);
   --color-danger-subtle: var(--danger-subtle);
 
+  --color-warning: var(--warning);
+  --color-warning-subtle: var(--warning-subtle);
+
   --radius-default: var(--radius);
 }
 
 :root {
-  /* Dark-only Linear / Vercel surface hierarchy */
-  --bg: #0A0B0D;
-  --surface-1: #111317;
-  --surface-2: #171A1F;
+  /* F1 Broadcast & Esports Surface Hierarchy */
+  --bg: #080B10;
+  --surface-1: #111722;
+  --surface-2: #172030;
 
-  /* Hairline 1px borders (~8% and ~15% white) */
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.15);
+  /* Crisp Telemetry Borders */
+  --border: rgba(245, 247, 250, 0.10);
+  --border-strong: rgba(0, 212, 255, 0.32);
 
-  /* Text hierarchy (never pure #fff on #000) */
-  --text-primary: #EDEDEF;
-  --text-secondary: #8A8F98;
-  --text-muted: #5C616B;
+  /* Text Hierarchy */
+  --text-primary: #F5F7FA;
+  --text-secondary: #8E9BAE;
+  --text-muted: #596579;
 
-  /* Brand accent: IEEE Blue */
-  --brand: #00629B;
-  --brand-light: #3B8FD0;
-  --brand-subtle: rgba(59, 143, 208, 0.12);
+  /* Primary Accent: Electric Telemetry Cyan */
+  --brand: #00D4FF;
+  --brand-light: #00D4FF;
+  --brand-subtle: rgba(0, 212, 255, 0.12);
 
-  /* Racing signal accent: Red-Orange (used ONLY for live dot, <10s, Hard, P1 leader, +3 pop) */
-  --signal: #FF4D2E;
-  --signal-subtle: rgba(255, 77, 46, 0.12);
+  /* Racing Signal Accent: F1 Crimson Red */
+  --signal: #FF453A;
+  --signal-subtle: rgba(255, 69, 58, 0.14);
 
-  /* Semantic status */
-  --success: #10B981;
-  --success-subtle: rgba(16, 185, 129, 0.12);
-  --danger: #E5484D;
-  --danger-subtle: rgba(229, 72, 77, 0.12);
+  /* Semantic Status */
+  --success: #36D399;
+  --success-subtle: rgba(54, 211, 153, 0.14);
+  --danger: #FF453A;
+  --danger-subtle: rgba(255, 69, 58, 0.14);
+  --warning: #F59E0B;
+  --warning-subtle: rgba(245, 158, 11, 0.14);
 
-  /* Single uniform 8px radius */
-  --radius: 8px;
+  /* Sharp Motorsport Geometry */
+  --radius: 6px;
 
-  /* Motion tokens (150-250ms ease-out) */
+  /* Motion Tokens (150-250ms ease-out) */
   --duration-ui: 180ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -90,23 +96,50 @@
   }
 }
 
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* Purposeful Track Asphalt Lane Texture & Start/Finish Timing Line */
+.track-asphalt {
+  background-color: #080B10;
+  background-image: linear-gradient(
+    to right,
+    rgba(245, 247, 250, 0.03) 1px,
+    transparent 1px
+  );
+  background-size: 64px 100%;
+}
+
+.start-finish-line {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(245, 247, 250, 0.85) 0px,
+    rgba(245, 247, 250, 0.85) 8px,
+    rgba(17, 23, 34, 0.9) 8px,
+    rgba(17, 23, 34, 0.9) 16px
+  );
+}
+
 /* Floating +1/+2/+3 gain indicator on /display (GPU transform & opacity only) */
 @keyframes floatStepPop {
   0% {
     opacity: 0;
-    transform: translate3d(0, 4px, 0);
+    transform: translate3d(0, 6px, 0) scale(0.92);
   }
-  15% {
+  16% {
     opacity: 1;
-    transform: translate3d(0, -6px, 0);
+    transform: translate3d(0, -6px, 0) scale(1);
   }
   82% {
     opacity: 1;
-    transform: translate3d(0, -20px, 0);
+    transform: translate3d(0, -22px, 0) scale(1);
   }
   100% {
     opacity: 0;
-    transform: translate3d(0, -26px, 0);
+    transform: translate3d(0, -28px, 0) scale(0.96);
   }
 }
 

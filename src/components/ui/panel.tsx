@@ -25,7 +25,7 @@ export function Panel({
       {...props}
     >
       {(label || rightSlot) && (
-        <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-3">
+        <div className="flex items-center justify-between gap-3 border-b border-border bg-elevated/35 px-5 py-3">
           {label ? <Label index={index}>{label}</Label> : <span />}
           {rightSlot && <div className="flex items-center gap-2">{rightSlot}</div>}
         </div>

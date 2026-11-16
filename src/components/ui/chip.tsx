@@ -3,15 +3,16 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/cn";
 
 const chipVariants = cva(
-  "inline-flex items-center gap-1.5 rounded-[var(--radius-default)] border px-2.5 py-0.5 font-mono text-xs font-medium tracking-[0.01em] tabular-nums select-none",
+  "inline-flex items-center gap-1.5 rounded-[var(--radius-default)] border px-2.5 py-0.5 font-mono text-xs font-medium tracking-[0.02em] tabular-nums select-none",
   {
     variants: {
       tone: {
         neutral: "border-border bg-elevated text-secondary",
-        brand: "border-brand-light/35 bg-brand-subtle text-brand-light",
-        signal: "border-signal/35 bg-signal-subtle text-signal",
-        success: "border-success/35 bg-success-subtle text-success",
-        danger: "border-danger/35 bg-danger-subtle text-danger",
+        brand: "border-brand-light/40 bg-brand-subtle text-brand-light",
+        signal: "border-signal/40 bg-signal-subtle text-signal",
+        success: "border-success/40 bg-success-subtle text-success",
+        danger: "border-danger/40 bg-danger-subtle text-danger",
+        warning: "border-warning/40 bg-warning-subtle text-warning",
       },
     },
     defaultVariants: {
@@ -43,6 +44,7 @@ export function Chip({
             tone === "signal" && "bg-signal",
             tone === "success" && "bg-success",
             tone === "danger" && "bg-danger",
+            tone === "warning" && "bg-warning",
             (tone === "neutral" || !tone) && "bg-secondary",
           )}
         />

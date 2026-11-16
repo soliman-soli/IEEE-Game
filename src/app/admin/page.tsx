@@ -46,6 +46,7 @@ import {
   useAuthoritativeCountdown,
 } from "@/lib/clock";
 import { cn } from "@/lib/cn";
+import { useJoinUrl } from "@/lib/use-join-url";
 import type { ArchivedRound } from "@/lib/engine/store";
 import type {
   Difficulty,
@@ -116,14 +117,11 @@ export default function AdminPortalPage() {
   const [qOpt3, setQOpt3] = useState("");
   const [qCorrect, setQCorrect] = useState<0 | 1 | 2 | 3>(0);
 
-  const [joinUrl, setJoinUrl] = useState("http://localhost:3000/play");
+  const joinUrl = useJoinUrl("/play");
+  const qrSrc = joinUrl
+    ? `/api/qr?url=${encodeURIComponent(joinUrl)}`
+    : "/api/qr?path=%2Fplay";
   const [showLargeQr, setShowLargeQr] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setJoinUrl(`${window.location.origin}/play`);
-    }
-  }, []);
 
   const syncFormFromRace = useCallback((race: Race) => {
     setCfgName(race.name);
@@ -449,8 +447,8 @@ export default function AdminPortalPage() {
             </CardHeader>
             <CardBody className="space-y-5">
               <div className="space-y-1">
-                <h1 className="font-sans text-xl font-medium tracking-[-0.02em] text-foreground">
-                  Race Control Login
+                <h1 className="font-display text-3xl font-bold tracking-wide text-foreground">
+                  RACE CONTROL LOGIN
                 </h1>
                 <p className="text-xs text-secondary">
                   Sign in to configure rounds, moderate players, and manage the
@@ -544,8 +542,8 @@ export default function AdminPortalPage() {
             </Link>
             <div className="min-w-0">
               <div className="flex items-center gap-2.5">
-                <span className="font-sans text-sm font-medium text-foreground">
-                  Race Control
+                <span className="font-display text-lg font-bold tracking-wider text-foreground">
+                  IEEE RACE CONTROL
                 </span>
                 <Chip
                   tone={
@@ -570,7 +568,7 @@ export default function AdminPortalPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <CopyButton value={joinUrl} label="Copy join link" />
+            <CopyButton value={joinUrl || "/play"} label="Copy join link" />
             <Link
               href="/display"
               target="_blank"
@@ -847,6 +845,73 @@ export default function AdminPortalPage() {
                 </div>
               </Panel>
 
+              {/* Live Event Monitor */}
+              <Panel
+                index="monitor"
+                label={`live standings (${players.length} drivers)`}
+                rightSlot={
+                  <Button
+                    variant="secondary"
+                    size="xs"
+                    onClick={() => setActiveTab("players")}
+                  >
+                    Manage all players
+                  </Button>
+                }
+              >
+                {players.length === 0 ? (
+                  <div className="p-5 text-center font-mono text-xs text-secondary">
+                    No players joined yet. Share {joinUrl || "/play"} or enlarge the QR code.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {players.slice(0, 5).map((p) => {
+                      const topSteps = Math.max(1, players[0]?.totalSteps ?? 1);
+                      const pct = Math.min(100, Math.round((p.totalSteps / topSteps) * 100));
+                      return (
+                        <div
+                          key={p.id}
+                          className="flex items-center justify-between gap-4 px-5 py-3"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span
+                              className={cn(
+                                "inline-flex size-6 shrink-0 items-center justify-center rounded-[4px] font-display text-xs font-bold tabular-nums",
+                                p.rank === 1 && p.totalSteps > 0
+                                  ? "bg-signal text-foreground"
+                                  : "bg-elevated text-secondary",
+                              )}
+                            >
+                              P{p.rank}
+                            </span>
+                            <RaceCarSvg
+                              color={p.carColor}
+                              carNumber={p.carNumber}
+                              size="sm"
+                            />
+                            <span className="truncate font-sans text-xs font-semibold text-foreground">
+                              {p.nickname}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0 font-mono text-xs tabular-nums">
+                            <div className="hidden h-1.5 w-28 overflow-hidden rounded-full bg-background sm:block">
+                              <div
+                                className="h-full bg-brand transition-all duration-300"
+                                style={{ width: `${p.totalSteps > 0 ? Math.max(6, pct) : 0}%` }}
+                              />
+                            </div>
+                            <span className="text-success">{p.correctCount}✓</span>
+                            <span className="w-14 text-right font-display text-base font-bold text-foreground">
+                              {p.totalSteps} st
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </Panel>
+
               {/* Pre-Race Configuration & Join QR */}
               <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
                 <Panel
@@ -1080,13 +1145,13 @@ export default function AdminPortalPage() {
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={`/api/qr?url=${encodeURIComponent(joinUrl)}`}
+                        src={qrSrc}
                         alt="Join QR"
                         className="size-36 block"
                       />
                     </button>
                     <p className="text-center font-mono text-xs text-brand-light break-all">
-                      {joinUrl}
+                      {joinUrl || "/play"}
                     </p>
 
                     <div className="space-y-2 border-t border-border pt-3 font-mono text-xs tabular-nums">
@@ -1402,7 +1467,7 @@ export default function AdminPortalPage() {
                 rightSlot={
                   <a
                     href={`/api/admin/export?raceId=${race.id}`}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-default)] bg-brand px-3 font-sans text-xs font-medium text-foreground"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-default)] bg-[#00D4FF] px-3 font-sans text-xs font-semibold text-[#080B10] transition-colors hover:bg-[#33DDFF]"
                   >
                     <Download className="size-3.5" />
                     <span>Export current CSV</span>
@@ -1608,7 +1673,7 @@ export default function AdminPortalPage() {
             <div className="mx-auto flex w-fit overflow-hidden rounded-[var(--radius-default)] border border-border bg-white p-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={`/api/qr?url=${encodeURIComponent(joinUrl)}`}
+                src={qrSrc}
                 alt="Large Join QR"
                 className="size-72 sm:size-96 md:size-[400px] block"
               />
@@ -1616,10 +1681,10 @@ export default function AdminPortalPage() {
 
             <div className="space-y-2">
               <p className="font-mono text-xl sm:text-2xl font-medium text-foreground break-all">
-                {joinUrl}
+                {joinUrl || "/play"}
               </p>
               <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                <CopyButton value={joinUrl} label="Copy join link" />
+                <CopyButton value={joinUrl || "/play"} label="Copy join link" />
                 {isLobby && (
                   <Button
                     variant="primary"

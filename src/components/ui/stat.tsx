@@ -5,7 +5,7 @@ export interface StatProps extends React.HTMLAttributes<HTMLDivElement> {
   label: string;
   value: React.ReactNode;
   sub?: React.ReactNode;
-  tone?: "default" | "brand" | "signal" | "success" | "danger";
+  tone?: "default" | "brand" | "signal" | "success" | "danger" | "warning";
 }
 
 export function Stat({
@@ -30,12 +30,13 @@ export function Stat({
       <div className="flex items-baseline justify-between gap-2">
         <span
           className={cn(
-            "font-mono text-xl font-medium tracking-tight tabular-nums",
+            "font-display text-2xl font-bold leading-none tracking-wide tabular-nums",
             tone === "default" && "text-foreground",
             tone === "brand" && "text-brand-light",
             tone === "signal" && "text-signal",
             tone === "success" && "text-success",
             tone === "danger" && "text-danger",
+            tone === "warning" && "text-warning",
           )}
         >
           {value}

@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Barlow_Condensed, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+
+const barlowCondensed = Barlow_Condensed({
+  weight: ["600", "700", "800"],
+  variable: "--font-display",
+  subsets: ["latin"],
+});
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,9 +19,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "IEEE Grand Prix",
+  title: "IEEE Grand Prix — Live Coding Circuit",
   description:
-    "A live multiplayer coding quiz where every correct answer moves your car forward on the big screen.",
+    "Live multiplayer strategic web development racing quiz with real-time broadcast telemetry and server-authoritative timing.",
 };
 
 export default function RootLayout({
@@ -26,7 +32,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} font-sans min-h-screen bg-background text-foreground antialiased selection:bg-brand selection:text-foreground`}
+        className={`${barlowCondensed.variable} ${geistSans.variable} ${geistMono.variable} font-sans min-h-screen bg-[#080B10] text-[#F5F7FA] antialiased selection:bg-[#00D4FF] selection:text-[#080B10]`}
       >
         {children}
       </body>
