@@ -2,6 +2,7 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { normalizeQuestionText } from "./question-set-validator";
 import { DEFAULT_QUESTIONS_SEED } from "./questions-seed";
 import {
   CAR_LIVERIES,
@@ -21,10 +22,15 @@ import type {
   PlayerPrivateView,
   PublicPlayer,
   Question,
+  QuestionSet,
+  QuestionSetSummary,
   Race,
   RaceConfig,
   RacePublicSnapshot,
 } from "./types";
+
+export const BUILT_IN_SET_ID = "builtin-web-dev";
+export const BUILT_IN_SET_NAME = "Web Dev (built-in)";
 
 export interface ArchivedRound {
   race: Omit<Race, "questionPoolIds">;
@@ -35,6 +41,7 @@ export interface ArchivedRound {
 interface StoreData {
   races: Race[];
   activeRaceId: string;
+  questionSets: QuestionSet[];
   questions: Question[];
   players: Player[];
   attempts: Attempt[];
@@ -54,11 +61,48 @@ function generateToken(): string {
   return crypto.randomBytes(24).toString("hex");
 }
 
+function ensureBuiltInSet(store: StoreData) {
+  if (!Array.isArray(store.questionSets)) {
+    store.questionSets = [];
+  }
+  const existingBuiltIn = store.questionSets.find((s) => s.id === BUILT_IN_SET_ID);
+  if (!existingBuiltIn) {
+    store.questionSets.unshift({
+      id: BUILT_IN_SET_ID,
+      name: BUILT_IN_SET_NAME,
+      isBuiltIn: true,
+      active: true,
+      shuffleOptions: false,
+      importedAt: new Date(0).toISOString(),
+    });
+  } else {
+    existingBuiltIn.isBuiltIn = true;
+  }
+
+  for (const q of store.questions) {
+    if (!q.setId) {
+      q.setId = BUILT_IN_SET_ID;
+    }
+  }
+
+  if (!store.questionSets.some((s) => s.active)) {
+    const builtIn = store.questionSets.find((s) => s.id === BUILT_IN_SET_ID);
+    if (builtIn) builtIn.active = true;
+    else if (store.questionSets[0]) store.questionSets[0].active = true;
+  }
+}
+
 function buildQuestionPool(
   questions: Question[],
+  questionSets: QuestionSet[],
   config: Pick<RaceConfig, "easyCount" | "mediumCount" | "hardCount">,
 ): Race["questionPoolIds"] {
-  const enabled = questions.filter((q) => q.enabled);
+  const activeSetIds = new Set(
+    questionSets.filter((s) => s.active).map((s) => s.id),
+  );
+  const enabled = questions.filter(
+    (q) => q.enabled && activeSetIds.has(q.setId ?? BUILT_IN_SET_ID),
+  );
   const easyIds = enabled.filter((q) => q.difficulty === "EASY").map((q) => q.id);
   const mediumIds = enabled.filter((q) => q.difficulty === "MEDIUM").map((q) => q.id);
   const hardIds = enabled.filter((q) => q.difficulty === "HARD").map((q) => q.id);
@@ -72,6 +116,7 @@ function buildQuestionPool(
 
 function createDefaultRace(
   questions: Question[],
+  questionSets: QuestionSet[],
   name = "Round 1",
   prevConfig?: Partial<RaceConfig>,
 ): Race {
@@ -93,7 +138,7 @@ function createDefaultRace(
     startsAt: null,
     endsAt: null,
     createdAt: new Date().toISOString(),
-    questionPoolIds: buildQuestionPool(questions, config),
+    questionPoolIds: buildQuestionPool(questions, questionSets, config),
   };
 }
 
@@ -250,7 +295,7 @@ async function syncAttemptToSupabase(attempt: Attempt) {
   const sb = getSupabaseAdmin();
   if (!sb) return;
   try {
-    await sb.from("attempts").upsert({
+    const payload: Record<string, unknown> = {
       id: attempt.id,
       race_id: attempt.raceId,
       player_id: attempt.playerId,
@@ -261,9 +306,34 @@ async function syncAttemptToSupabase(attempt: Attempt) {
       steps_awarded: attempt.stepsAwarded,
       created_at: attempt.createdAt,
       resolved_at: attempt.resolvedAt,
-    });
+    };
+    if (attempt.optionOrder) {
+      payload.option_order = attempt.optionOrder;
+    }
+    const { error } = await sb.from("attempts").upsert(payload);
+    if (error && payload.option_order !== undefined) {
+      delete payload.option_order;
+      await sb.from("attempts").upsert(payload);
+    }
   } catch {
     // Non-blocking
+  }
+}
+
+async function syncQuestionSetToSupabase(set: QuestionSet) {
+  const sb = getSupabaseAdmin();
+  if (!sb) return;
+  try {
+    await sb.from("question_sets").upsert({
+      id: set.id,
+      name: set.name,
+      is_built_in: set.isBuiltIn,
+      active: set.active,
+      shuffle_options: set.shuffleOptions,
+      imported_at: set.importedAt,
+    });
+  } catch {
+    // Non-blocking if migration 0002 is not yet applied
   }
 }
 
@@ -271,18 +341,33 @@ async function syncQuestionsToSupabase(questions: Question[]) {
   const sb = getSupabaseAdmin();
   if (!sb || questions.length === 0) return;
   try {
-    await sb.from("questions").upsert(
-      questions.map((q) => ({
-        id: q.id,
-        difficulty: q.difficulty,
-        category: q.category,
-        prompt: q.prompt,
-        code_snippet: q.codeSnippet ?? null,
-        options: q.options,
-        correct_index: q.correctIndex,
-        enabled: q.enabled,
-      })),
-    );
+    const rows = questions.map((q) => ({
+      id: q.id,
+      set_id: q.setId ?? BUILT_IN_SET_ID,
+      difficulty: q.difficulty,
+      category: q.category,
+      prompt: q.prompt,
+      code_snippet: q.codeSnippet ?? null,
+      options: q.options,
+      correct_index: q.correctIndex,
+      enabled: q.enabled,
+    }));
+    const { error } = await sb.from("questions").upsert(rows);
+    if (error) {
+      // Fallback if set_id column is not yet present on Supabase
+      await sb.from("questions").upsert(
+        questions.map((q) => ({
+          id: q.id,
+          difficulty: q.difficulty,
+          category: q.category,
+          prompt: q.prompt,
+          code_snippet: q.codeSnippet ?? null,
+          options: q.options,
+          correct_index: q.correctIndex,
+          enabled: q.enabled,
+        })),
+      );
+    }
   } catch {
     // Non-blocking
   }
@@ -293,33 +378,56 @@ async function hydrateOrSeedSupabase(store: StoreData) {
   if (!sb) return;
 
   try {
-    // 1. Load static questions once per serverless instance (or seed if empty)
-    if (!store.hydratedFromSupabase) {
-      const { data: dbQuestions } = await sb.from("questions").select("*");
-      if (!dbQuestions || dbQuestions.length === 0) {
+    // Always fetch live question_sets, questions, races, pool, players, and attempts in parallel
+    const [setsRes, questionsRes, racesRes, poolRes, playersRes, attemptsRes] =
+      await Promise.all([
+        sb.from("question_sets").select("*").order("imported_at", { ascending: true }),
+        sb.from("questions").select("*"),
+        sb.from("races").select("*").order("created_at", { ascending: true }),
+        sb.from("race_questions").select("*"),
+        sb.from("players").select("*"),
+        sb.from("attempts").select("*"),
+      ]);
+
+    if (!setsRes.error && setsRes.data) {
+      if (setsRes.data.length === 0) {
+        ensureBuiltInSet(store);
+        const builtIn = store.questionSets.find((s) => s.id === BUILT_IN_SET_ID);
+        if (builtIn) await syncQuestionSetToSupabase(builtIn);
+      } else {
+        store.questionSets = setsRes.data.map((row) => ({
+          id: String(row.id),
+          name: String(row.name),
+          isBuiltIn: Boolean(row.is_built_in),
+          active: Boolean(row.active),
+          shuffleOptions: Boolean(row.shuffle_options),
+          importedAt: String(row.imported_at),
+        }));
+      }
+    }
+
+    if (!questionsRes.error && questionsRes.data) {
+      if (questionsRes.data.length === 0) {
+        ensureBuiltInSet(store);
         await syncQuestionsToSupabase(store.questions);
       } else {
-        store.questions = dbQuestions.map((row) => ({
+        store.questions = questionsRes.data.map((row) => ({
           id: String(row.id),
+          setId: row.set_id ? String(row.set_id) : BUILT_IN_SET_ID,
           difficulty: row.difficulty as Difficulty,
-          category: row.category as Question["category"],
+          category: String(row.category),
           prompt: String(row.prompt),
           codeSnippet: row.code_snippet ? String(row.code_snippet) : null,
-          options: row.options as [string, string, string, string],
-          correctIndex: Number(row.correct_index) as 0 | 1 | 2 | 3,
+          options: Array.isArray(row.options)
+            ? (row.options as unknown[]).map((o) => String(o))
+            : [],
+          correctIndex: Number(row.correct_index),
           enabled: Boolean(row.enabled),
         }));
       }
-      store.hydratedFromSupabase = true;
     }
-
-    // 2. Always fetch live races, pool, players, and attempts in parallel so all Vercel serverless instances stay 100% synchronized
-    const [racesRes, poolRes, playersRes, attemptsRes] = await Promise.all([
-      sb.from("races").select("*").order("created_at", { ascending: true }),
-      sb.from("race_questions").select("*"),
-      sb.from("players").select("*"),
-      sb.from("attempts").select("*"),
-    ]);
+    ensureBuiltInSet(store);
+    store.hydratedFromSupabase = true;
 
     const dbRaces = racesRes.data;
     if (!dbRaces || dbRaces.length === 0) {
@@ -356,7 +464,9 @@ async function hydrateOrSeedSupabase(store: StoreData) {
         startsAt: r.starts_at ? String(r.starts_at) : null,
         endsAt: r.ends_at ? String(r.ends_at) : null,
         createdAt: String(r.created_at),
-        questionPoolIds: hasPool ? poolIds : buildQuestionPool(store.questions, cfg),
+        questionPoolIds: hasPool
+          ? poolIds
+          : buildQuestionPool(store.questions, store.questionSets, cfg),
       };
     });
 
@@ -396,13 +506,15 @@ async function hydrateOrSeedSupabase(store: StoreData) {
         difficulty: a.difficulty as Difficulty,
         status: a.status as Attempt["status"],
         selectedIndex: a.selected_index !== null ? Number(a.selected_index) : null,
+        optionOrder: Array.isArray(a.option_order)
+          ? (a.option_order as unknown[]).map((n) => Number(n))
+          : null,
         stepsAwarded: Number(a.steps_awarded),
         createdAt: String(a.created_at),
         resolvedAt: a.resolved_at ? String(a.resolved_at) : null,
       }));
     }
 
-    // Reconstruct archived round history from previous rounds
     store.history = loadedRaces
       .filter((r) => r.id !== store.activeRaceId || r.status === "FINISHED")
       .map((r) => ({
@@ -421,6 +533,7 @@ async function hydrateOrSeedSupabase(store: StoreData) {
 
 function loadStoreFromDisk(): StoreData {
   if (globalForStore.__ieeeGameStore) {
+    ensureBuiltInSet(globalForStore.__ieeeGameStore);
     return globalForStore.__ieeeGameStore;
   }
   try {
@@ -428,6 +541,7 @@ function loadStoreFromDisk(): StoreData {
       const raw = fs.readFileSync(DATA_FILE, "utf8");
       const parsed = JSON.parse(raw) as StoreData;
       if (parsed && Array.isArray(parsed.races) && parsed.races.length > 0) {
+        ensureBuiltInSet(parsed);
         globalForStore.__ieeeGameStore = parsed;
         return parsed;
       }
@@ -436,11 +550,25 @@ function loadStoreFromDisk(): StoreData {
     // Fall back to fresh store
   }
 
-  const questions = [...DEFAULT_QUESTIONS_SEED];
-  const initialRace = createDefaultRace(questions, "Round 1");
+  const questions: Question[] = DEFAULT_QUESTIONS_SEED.map((q) => ({
+    ...q,
+    setId: BUILT_IN_SET_ID,
+  }));
+  const questionSets: QuestionSet[] = [
+    {
+      id: BUILT_IN_SET_ID,
+      name: BUILT_IN_SET_NAME,
+      isBuiltIn: true,
+      active: true,
+      shuffleOptions: false,
+      importedAt: new Date(0).toISOString(),
+    },
+  ];
+  const initialRace = createDefaultRace(questions, questionSets, "Round 1");
   const initial: StoreData = {
     races: [initialRace],
     activeRaceId: initialRace.id,
+    questionSets,
     questions,
     players: [],
     attempts: [],
@@ -521,6 +649,62 @@ function getRemainingByDifficulty(store: StoreData, race: Race, playerId: string
   };
 }
 
+function shuffleOptionIndices(length: number): number[] {
+  const indices = Array.from({ length }, (_, i) => i);
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  return indices;
+}
+
+function buildPublicQuestionForAttempt(
+  question: Question,
+  attempt: Attempt,
+): ReturnType<typeof stripSecretFromQuestion> {
+  const base = stripSecretFromQuestion(question);
+  if (
+    Array.isArray(attempt.optionOrder) &&
+    attempt.optionOrder.length === question.options.length
+  ) {
+    return {
+      ...base,
+      options: attempt.optionOrder.map((idx) => question.options[idx]),
+    };
+  }
+  return base;
+}
+
+function getSetSummaries(store: StoreData): QuestionSetSummary[] {
+  return store.questionSets.map((set) => {
+    const setQuestions = store.questions.filter(
+      (q) => q.enabled && (q.setId ?? BUILT_IN_SET_ID) === set.id,
+    );
+    return {
+      ...set,
+      totalCount: setQuestions.length,
+      easyCount: setQuestions.filter((q) => q.difficulty === "EASY").length,
+      mediumCount: setQuestions.filter((q) => q.difficulty === "MEDIUM").length,
+      hardCount: setQuestions.filter((q) => q.difficulty === "HARD").length,
+    };
+  });
+}
+
+function getActivePoolSummary(store: StoreData) {
+  const activeSetIds = new Set(
+    store.questionSets.filter((s) => s.active).map((s) => s.id),
+  );
+  const activeEnabled = store.questions.filter(
+    (q) => q.enabled && activeSetIds.has(q.setId ?? BUILT_IN_SET_ID),
+  );
+  return {
+    total: activeEnabled.length,
+    EASY: activeEnabled.filter((q) => q.difficulty === "EASY").length,
+    MEDIUM: activeEnabled.filter((q) => q.difficulty === "MEDIUM").length,
+    HARD: activeEnabled.filter((q) => q.difficulty === "HARD").length,
+  };
+}
+
 // ============================================================================
 // PUBLIC / READ QUERIES
 // ============================================================================
@@ -569,7 +753,7 @@ export async function getPlayerPrivateView(playerToken: string): Promise<PlayerP
           attemptId: activeAttemptRow.id,
           difficulty: activeAttemptRow.difficulty,
           rewardSteps: getRewardForDifficulty(race, activeAttemptRow.difficulty),
-          question: stripSecretFromQuestion(q),
+          question: buildPublicQuestionForAttempt(q, activeAttemptRow),
         };
       }
     }
@@ -713,7 +897,7 @@ export async function pickDifficulty(
             attemptId: existingActive.id,
             difficulty: existingActive.difficulty,
             rewardSteps: getRewardForDifficulty(race, existingActive.difficulty),
-            question: stripSecretFromQuestion(existingQ),
+            question: buildPublicQuestionForAttempt(existingQ, existingActive),
           },
           serverTime: new Date().toISOString(),
         };
@@ -737,6 +921,13 @@ export async function pickDifficulty(
       throw new Error("Selected question could not be loaded.");
     }
 
+    const qSet = store.questionSets.find(
+      (s) => s.id === (question.setId ?? BUILT_IN_SET_ID),
+    );
+    const optionOrder = qSet?.shuffleOptions
+      ? shuffleOptionIndices(question.options.length)
+      : null;
+
     const attempt: Attempt = {
       id: crypto.randomUUID(),
       raceId: race.id,
@@ -745,6 +936,7 @@ export async function pickDifficulty(
       difficulty,
       status: "ACTIVE",
       selectedIndex: null,
+      optionOrder,
       stepsAwarded: 0,
       createdAt: new Date(nowMs).toISOString(),
       resolvedAt: null,
@@ -765,7 +957,7 @@ export async function pickDifficulty(
         attemptId: attempt.id,
         difficulty: attempt.difficulty,
         rewardSteps: getRewardForDifficulty(race, attempt.difficulty),
-        question: stripSecretFromQuestion(question),
+        question: buildPublicQuestionForAttempt(question, attempt),
       },
       serverTime: new Date().toISOString(),
     };
@@ -781,8 +973,8 @@ export async function submitAnswer(
   stepsEarned: number;
   view: PlayerPrivateView;
 }> {
-  if (![0, 1, 2, 3].includes(selectedIndex)) {
-    throw new Error("Answer option must be 0, 1, 2, or 3.");
+  if (!Number.isInteger(selectedIndex) || selectedIndex < 0 || selectedIndex > 5) {
+    throw new Error("Invalid answer option index.");
   }
 
   return withStoreLock(async (store) => {
@@ -827,8 +1019,17 @@ export async function submitAnswer(
     if (!question) {
       throw new Error("Question not found.");
     }
+    if (selectedIndex >= question.options.length) {
+      throw new Error("Selected answer option is out of range.");
+    }
 
-    const isCorrect = selectedIndex === question.correctIndex;
+    const canonicalIndex =
+      Array.isArray(attempt.optionOrder) &&
+      attempt.optionOrder.length === question.options.length
+        ? attempt.optionOrder[selectedIndex]
+        : selectedIndex;
+
+    const isCorrect = canonicalIndex === question.correctIndex;
     const reward = isCorrect ? getRewardForDifficulty(race, attempt.difficulty) : 0;
 
     attempt.selectedIndex = selectedIndex;
@@ -945,16 +1146,19 @@ export async function getAdminDashboardData() {
     const race = getActiveRace(store);
     const racePlayers = store.players.filter((p) => p.raceId === race.id);
     const ranked = rankPlayers(racePlayers);
+    const activePoolSummary = getActivePoolSummary(store);
     const enabledCounts = {
-      EASY: store.questions.filter((q) => q.enabled && q.difficulty === "EASY").length,
-      MEDIUM: store.questions.filter((q) => q.enabled && q.difficulty === "MEDIUM").length,
-      HARD: store.questions.filter((q) => q.enabled && q.difficulty === "HARD").length,
+      EASY: activePoolSummary.EASY,
+      MEDIUM: activePoolSummary.MEDIUM,
+      HARD: activePoolSummary.HARD,
     };
 
     return {
       race,
       players: ranked,
       questions: store.questions,
+      questionSets: getSetSummaries(store),
+      activePoolSummary,
       enabledCounts,
       history: store.history,
       storageMode: getSupabaseAdmin() ? "SUPABASE" : "LOCAL_PERSISTENT",
@@ -996,7 +1200,7 @@ export async function updateRaceConfig(patch: Partial<RaceConfig>): Promise<Race
       race.allowAbandon = Boolean(patch.allowAbandon);
     }
 
-    race.questionPoolIds = buildQuestionPool(store.questions, race);
+    race.questionPoolIds = buildQuestionPool(store.questions, store.questionSets, race);
     persistStoreToDisk(store);
     await syncRaceToSupabase(race, true, true);
     return race;
@@ -1016,7 +1220,7 @@ export async function startRace(): Promise<Race> {
         race.questionPoolIds.HARD.length >
       0;
     if (!hasPool) {
-      race.questionPoolIds = buildQuestionPool(store.questions, race);
+      race.questionPoolIds = buildQuestionPool(store.questions, store.questionSets, race);
     }
     const nowMs = Date.now();
     const startsMs = nowMs + START_COUNTDOWN_MS;
@@ -1080,7 +1284,7 @@ export async function resetCurrentRace(): Promise<Race> {
     race.status = "LOBBY";
     race.startsAt = null;
     race.endsAt = null;
-    race.questionPoolIds = buildQuestionPool(store.questions, race);
+    race.questionPoolIds = buildQuestionPool(store.questions, store.questionSets, race);
 
     const sb = getSupabaseAdmin();
     for (const p of store.players) {
@@ -1129,7 +1333,7 @@ export async function createNewRound(customName?: string): Promise<Race> {
 
     const roundNumber = store.races.length + 1;
     const nextName = customName?.trim() || `Round ${roundNumber}`;
-    const newRace = createDefaultRace(store.questions, nextName, prevRace);
+    const newRace = createDefaultRace(store.questions, store.questionSets, nextName, prevRace);
 
     store.races.push(newRace);
     store.activeRaceId = newRace.id;
@@ -1191,18 +1395,15 @@ export async function upsertQuestion(
 ): Promise<Question> {
   return withStoreLock(async (store) => {
     const id = q.id?.trim() || `custom-${crypto.randomUUID().slice(0, 8)}`;
+    const existing = store.questions.find((item) => item.id === id);
     const normalized: Question = {
       id,
+      setId: q.setId ?? existing?.setId ?? BUILT_IN_SET_ID,
       difficulty: q.difficulty,
       category: q.category,
       prompt: q.prompt.trim(),
       codeSnippet: q.codeSnippet?.trim() ? q.codeSnippet : null,
-      options: [
-        q.options[0].trim(),
-        q.options[1].trim(),
-        q.options[2].trim(),
-        q.options[3].trim(),
-      ],
+      options: q.options.map((o) => o.trim()),
       correctIndex: q.correctIndex,
       enabled: q.enabled ?? true,
     };
@@ -1216,8 +1417,8 @@ export async function upsertQuestion(
 
     const race = getActiveRace(store);
     if (race.status === "LOBBY") {
-      race.questionPoolIds = buildQuestionPool(store.questions, race);
-      await syncRaceToSupabase(race, true);
+      race.questionPoolIds = buildQuestionPool(store.questions, store.questionSets, race);
+      await syncRaceToSupabase(race, true, true);
     }
     persistStoreToDisk(store);
     await syncQuestionsToSupabase([normalized]);
@@ -1235,8 +1436,8 @@ export async function toggleQuestionEnabled(
     q.enabled = enabled;
     const race = getActiveRace(store);
     if (race.status === "LOBBY") {
-      race.questionPoolIds = buildQuestionPool(store.questions, race);
-      await syncRaceToSupabase(race, true);
+      race.questionPoolIds = buildQuestionPool(store.questions, store.questionSets, race);
+      await syncRaceToSupabase(race, true, true);
     }
     persistStoreToDisk(store);
     await syncQuestionsToSupabase([q]);
@@ -1248,8 +1449,8 @@ export async function deleteQuestion(questionId: string): Promise<void> {
     store.questions = store.questions.filter((item) => item.id !== questionId);
     const race = getActiveRace(store);
     if (race.status === "LOBBY") {
-      race.questionPoolIds = buildQuestionPool(store.questions, race);
-      await syncRaceToSupabase(race, true);
+      race.questionPoolIds = buildQuestionPool(store.questions, store.questionSets, race);
+      await syncRaceToSupabase(race, true, true);
     }
     persistStoreToDisk(store);
     const sb = getSupabaseAdmin();
@@ -1272,27 +1473,24 @@ export async function importQuestionsBulk(items: Partial<Question>[]): Promise<n
         !raw.difficulty ||
         !["EASY", "MEDIUM", "HARD"].includes(raw.difficulty) ||
         !Array.isArray(raw.options) ||
-        raw.options.length !== 4 ||
+        raw.options.length < 2 ||
+        raw.options.length > 6 ||
         typeof raw.correctIndex !== "number" ||
         raw.correctIndex < 0 ||
-        raw.correctIndex > 3
+        raw.correctIndex >= raw.options.length
       ) {
         continue;
       }
       const id = raw.id?.trim() || `imp-${crypto.randomUUID().slice(0, 8)}`;
       const item: Question = {
         id,
+        setId: raw.setId ?? BUILT_IN_SET_ID,
         difficulty: raw.difficulty as Difficulty,
         category: (raw.category as Question["category"]) || "Fundamentals",
         prompt: String(raw.prompt).trim(),
         codeSnippet: raw.codeSnippet ? String(raw.codeSnippet) : null,
-        options: [
-          String(raw.options[0]),
-          String(raw.options[1]),
-          String(raw.options[2]),
-          String(raw.options[3]),
-        ],
-        correctIndex: raw.correctIndex as 0 | 1 | 2 | 3,
+        options: raw.options.map((o) => String(o)),
+        correctIndex: raw.correctIndex,
         enabled: raw.enabled ?? true,
       };
       const existingIdx = store.questions.findIndex((q) => q.id === id);
@@ -1306,11 +1504,325 @@ export async function importQuestionsBulk(items: Partial<Question>[]): Promise<n
 
     const race = getActiveRace(store);
     if (race.status === "LOBBY") {
-      race.questionPoolIds = buildQuestionPool(store.questions, race);
-      await syncRaceToSupabase(race, true);
+      race.questionPoolIds = buildQuestionPool(store.questions, store.questionSets, race);
+      await syncRaceToSupabase(race, true, true);
     }
     persistStoreToDisk(store);
     await syncQuestionsToSupabase(imported);
     return imported.length;
+  });
+}
+
+// ============================================================================
+// QUESTION SETS CRUD & POOL MANAGEMENT
+// ============================================================================
+
+export async function getQuestionSetsOverview() {
+  return withStoreLock((store) => {
+    const race = getActiveRace(store);
+    return {
+      questionSets: getSetSummaries(store),
+      activePoolSummary: getActivePoolSummary(store),
+      raceStatus: race.status,
+      raceConfig: {
+        easyCount: race.easyCount,
+        mediumCount: race.mediumCount,
+        hardCount: race.hardCount,
+      },
+    };
+  });
+}
+
+export async function getQuestionSetDetail(setId: string): Promise<{
+  set: QuestionSetSummary;
+  questions: Question[];
+}> {
+  return withStoreLock((store) => {
+    const summary = getSetSummaries(store).find((s) => s.id === setId);
+    if (!summary) {
+      throw new Error("Question set not found.");
+    }
+    const questions = store.questions.filter(
+      (q) => (q.setId ?? BUILT_IN_SET_ID) === setId,
+    );
+    return { set: summary, questions };
+  });
+}
+
+export async function importQuestionSet(input: {
+  name: string;
+  questions: Array<{
+    id: string;
+    difficulty: Difficulty;
+    category: string;
+    prompt: string;
+    codeSnippet?: string | null;
+    options: string[];
+    correctIndex: number;
+  }>;
+  conflictStrategy?: "replace" | "rename" | "cancel";
+  skipDuplicates?: boolean;
+}): Promise<{
+  set: QuestionSetSummary;
+  importedCount: number;
+  skippedDuplicateCount: number;
+  appliedToNextRound: boolean;
+}> {
+  const cleanName = input.name.trim();
+  if (!cleanName) {
+    throw new Error("Question set name cannot be empty.");
+  }
+  if (!Array.isArray(input.questions) || input.questions.length === 0) {
+    throw new Error("Cannot import an empty question set.");
+  }
+
+  return withStoreLock(async (store) => {
+    const existingSameName = store.questionSets.find(
+      (s) => s.name.toLowerCase() === cleanName.toLowerCase(),
+    );
+
+    let targetSetId: string;
+    let finalName = cleanName;
+    const strategy = input.conflictStrategy ?? "rename";
+
+    if (existingSameName) {
+      if (strategy === "cancel") {
+        throw new Error(`A question set named "${existingSameName.name}" already exists.`);
+      }
+      if (strategy === "replace") {
+        if (existingSameName.isBuiltIn) {
+          throw new Error("Cannot replace the built-in Web Dev set. Choose Rename instead.");
+        }
+        targetSetId = existingSameName.id;
+        // Remove old questions belonging to the replaced set
+        const oldIds = new Set(
+          store.questions
+            .filter((q) => q.setId === targetSetId)
+            .map((q) => q.id),
+        );
+        store.questions = store.questions.filter((q) => q.setId !== targetSetId);
+        const sb = getSupabaseAdmin();
+        if (sb && oldIds.size > 0) {
+          try {
+            await sb.from("questions").delete().eq("set_id", targetSetId);
+          } catch {
+            // Ignore
+          }
+        }
+      } else {
+        // Rename with numeric suffix
+        let suffix = 2;
+        while (
+          store.questionSets.some(
+            (s) => s.name.toLowerCase() === `${cleanName} (${suffix})`.toLowerCase(),
+          )
+        ) {
+          suffix += 1;
+        }
+        finalName = `${cleanName} (${suffix})`;
+        targetSetId = `set-${crypto.randomUUID().slice(0, 10)}`;
+      }
+    } else {
+      targetSetId = `set-${crypto.randomUUID().slice(0, 10)}`;
+    }
+
+    const activeSetIds = new Set(
+      store.questionSets
+        .filter((s) => s.active && s.id !== targetSetId)
+        .map((s) => s.id),
+    );
+    const activePrompts = new Set(
+      store.questions
+        .filter((q) => q.enabled && activeSetIds.has(q.setId ?? BUILT_IN_SET_ID))
+        .map((q) => normalizeQuestionText(q.prompt)),
+    );
+    const seenInImport = new Set<string>();
+    const existingAllIds = new Set(store.questions.map((q) => q.id));
+
+    const newQuestions: Question[] = [];
+    let skippedDuplicateCount = 0;
+
+    for (const raw of input.questions) {
+      const norm = normalizeQuestionText(raw.prompt);
+      const isDup = seenInImport.has(norm) || activePrompts.has(norm);
+      if (input.skipDuplicates && isDup) {
+        skippedDuplicateCount += 1;
+        continue;
+      }
+      seenInImport.add(norm);
+
+      let qId = raw.id.trim() || `q-${crypto.randomUUID().slice(0, 8)}`;
+      if (existingAllIds.has(qId)) {
+        qId = `${targetSetId.slice(0, 6)}-${crypto.randomUUID().slice(0, 8)}`;
+      }
+      existingAllIds.add(qId);
+
+      newQuestions.push({
+        id: qId,
+        setId: targetSetId,
+        difficulty: raw.difficulty,
+        category: raw.category.trim() || "General",
+        prompt: raw.prompt.trim(),
+        codeSnippet: raw.codeSnippet ?? null,
+        options: raw.options.map((o) => o.trim()),
+        correctIndex: raw.correctIndex,
+        enabled: true,
+      });
+    }
+
+    if (newQuestions.length === 0) {
+      throw new Error(
+        "All questions were skipped as duplicates. Nothing was imported.",
+      );
+    }
+
+    const newSet: QuestionSet = {
+      id: targetSetId,
+      name: finalName,
+      isBuiltIn: false,
+      active: true,
+      shuffleOptions: false,
+      importedAt: new Date().toISOString(),
+    };
+
+    const existingSetIdx = store.questionSets.findIndex((s) => s.id === targetSetId);
+    if (existingSetIdx >= 0) {
+      store.questionSets[existingSetIdx] = newSet;
+    } else {
+      store.questionSets.push(newSet);
+    }
+    store.questions.push(...newQuestions);
+
+    const race = getActiveRace(store);
+    const appliedToNextRound = race.status !== "LOBBY";
+    if (!appliedToNextRound) {
+      race.questionPoolIds = buildQuestionPool(store.questions, store.questionSets, race);
+      await syncRaceToSupabase(race, true, true);
+    }
+
+    persistStoreToDisk(store);
+    await syncQuestionSetToSupabase(newSet);
+    await syncQuestionsToSupabase(newQuestions);
+
+    const summary = getSetSummaries(store).find((s) => s.id === targetSetId)!;
+    return {
+      set: summary,
+      importedCount: newQuestions.length,
+      skippedDuplicateCount,
+      appliedToNextRound,
+    };
+  });
+}
+
+export async function toggleQuestionSetActive(
+  setId: string,
+  active: boolean,
+): Promise<{ appliedToNextRound: boolean }> {
+  return withStoreLock(async (store) => {
+    const target = store.questionSets.find((s) => s.id === setId);
+    if (!target) throw new Error("Question set not found.");
+
+    if (!active) {
+      const otherActive = store.questionSets.filter(
+        (s) => s.id !== setId && s.active,
+      );
+      if (otherActive.length === 0) {
+        throw new Error("At least one question set must stay active.");
+      }
+    }
+
+    target.active = active;
+    const race = getActiveRace(store);
+    const appliedToNextRound = race.status !== "LOBBY";
+    if (!appliedToNextRound) {
+      race.questionPoolIds = buildQuestionPool(store.questions, store.questionSets, race);
+      await syncRaceToSupabase(race, true, true);
+    }
+
+    persistStoreToDisk(store);
+    await syncQuestionSetToSupabase(target);
+    return { appliedToNextRound };
+  });
+}
+
+export async function renameQuestionSet(
+  setId: string,
+  newName: string,
+): Promise<QuestionSet> {
+  const clean = newName.trim();
+  if (!clean) throw new Error("Set name cannot be empty.");
+  return withStoreLock(async (store) => {
+    const target = store.questionSets.find((s) => s.id === setId);
+    if (!target) throw new Error("Question set not found.");
+    const duplicate = store.questionSets.some(
+      (s) => s.id !== setId && s.name.toLowerCase() === clean.toLowerCase(),
+    );
+    if (duplicate) {
+      throw new Error(`Another question set is already named "${clean}".`);
+    }
+    target.name = clean;
+    persistStoreToDisk(store);
+    await syncQuestionSetToSupabase(target);
+    return target;
+  });
+}
+
+export async function toggleQuestionSetShuffle(
+  setId: string,
+  shuffleOptions: boolean,
+): Promise<QuestionSet> {
+  return withStoreLock(async (store) => {
+    const target = store.questionSets.find((s) => s.id === setId);
+    if (!target) throw new Error("Question set not found.");
+    target.shuffleOptions = shuffleOptions;
+    persistStoreToDisk(store);
+    await syncQuestionSetToSupabase(target);
+    return target;
+  });
+}
+
+export async function deleteQuestionSet(
+  setId: string,
+): Promise<{ appliedToNextRound: boolean }> {
+  return withStoreLock(async (store) => {
+    const target = store.questionSets.find((s) => s.id === setId);
+    if (!target) throw new Error("Question set not found.");
+    if (target.isBuiltIn) {
+      throw new Error(
+        "The built-in Web Dev set cannot be deleted. You can deactivate it instead.",
+      );
+    }
+    if (target.active) {
+      const otherActive = store.questionSets.filter(
+        (s) => s.id !== setId && s.active,
+      );
+      if (otherActive.length === 0) {
+        throw new Error(
+          "At least one active set must remain before deleting this set.",
+        );
+      }
+    }
+
+    store.questionSets = store.questionSets.filter((s) => s.id !== setId);
+    store.questions = store.questions.filter((q) => q.setId !== setId);
+
+    const race = getActiveRace(store);
+    const appliedToNextRound = race.status !== "LOBBY";
+    if (!appliedToNextRound) {
+      race.questionPoolIds = buildQuestionPool(store.questions, store.questionSets, race);
+      await syncRaceToSupabase(race, true, true);
+    }
+
+    persistStoreToDisk(store);
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      try {
+        await sb.from("questions").delete().eq("set_id", setId);
+        await sb.from("question_sets").delete().eq("id", setId);
+      } catch {
+        // Ignore
+      }
+    }
+    return { appliedToNextRound };
   });
 }

@@ -8,6 +8,7 @@ import {
   Download,
   ExternalLink,
   FileQuestion,
+  Layers,
   Lock,
   LogOut,
   Maximize2,
@@ -23,6 +24,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { QuestionSetsPanel } from "@/components/admin/question-sets-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Chip } from "@/components/ui/chip";
@@ -53,6 +55,7 @@ import type {
   PublicPlayer,
   Question,
   QuestionCategory,
+  QuestionSetSummary,
   Race,
 } from "@/lib/engine/types";
 
@@ -60,13 +63,20 @@ interface AdminPayload {
   race: Race;
   players: PublicPlayer[];
   questions: Question[];
+  questionSets: QuestionSetSummary[];
+  activePoolSummary: {
+    total: number;
+    EASY: number;
+    MEDIUM: number;
+    HARD: number;
+  };
   enabledCounts: { EASY: number; MEDIUM: number; HARD: number };
   history: ArchivedRound[];
   storageMode: string;
   serverTime: string;
 }
 
-type AdminTab = "control" | "players" | "questions" | "results";
+type AdminTab = "control" | "players" | "sets" | "questions" | "results";
 
 export default function AdminPortalPage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -115,7 +125,7 @@ export default function AdminPortalPage() {
   const [qOpt1, setQOpt1] = useState("");
   const [qOpt2, setQOpt2] = useState("");
   const [qOpt3, setQOpt3] = useState("");
-  const [qCorrect, setQCorrect] = useState<0 | 1 | 2 | 3>(0);
+  const [qCorrect, setQCorrect] = useState<number>(0);
 
   const joinUrl = useJoinUrl("/play");
   const qrSrc = joinUrl
@@ -503,8 +513,22 @@ export default function AdminPortalPage() {
     );
   }
 
-  const { race, players, questions, enabledCounts, history } = data;
+  const {
+    race,
+    players,
+    questions,
+    questionSets = [],
+    enabledCounts,
+    history,
+  } = data;
+  const activePoolSummary = data.activePoolSummary ?? {
+    total: enabledCounts.EASY + enabledCounts.MEDIUM + enabledCounts.HARD,
+    EASY: enabledCounts.EASY,
+    MEDIUM: enabledCounts.MEDIUM,
+    HARD: enabledCounts.HARD,
+  };
   const isLobby = race.status === "LOBBY";
+  const activeSetsCount = questionSets.filter((s) => s.active).length;
 
   const filteredPlayers = players.filter((p) =>
     playerSearch.trim()
@@ -606,6 +630,12 @@ export default function AdminPortalPage() {
                   label: "Players",
                   icon: Users,
                   badge: String(players.length),
+                },
+                {
+                  id: "sets" as AdminTab,
+                  label: "Question Sets",
+                  icon: Layers,
+                  badge: `${activeSetsCount}/${questionSets.length || 1}`,
                 },
                 {
                   id: "questions" as AdminTab,
@@ -1306,7 +1336,26 @@ export default function AdminPortalPage() {
             </Panel>
           )}
 
-          {/* TAB 3: QUESTION BANK MANAGER */}
+          {/* TAB 3: QUESTION SETS */}
+          {activeTab === "sets" && (
+            <QuestionSetsPanel
+              race={race}
+              questionSets={questionSets}
+              questions={questions}
+              activePoolSummary={activePoolSummary}
+              onDashboardUpdated={(payload) => setData(payload as AdminPayload)}
+              onSuccessToast={(msg) => {
+                setErrorMsg(null);
+                setActionMsg(msg);
+              }}
+              onErrorToast={(msg) => {
+                setActionMsg(null);
+                setErrorMsg(msg);
+              }}
+            />
+          )}
+
+          {/* TAB 4: QUESTION BANK MANAGER */}
           {activeTab === "questions" && (
             <div className="space-y-4">
               <Panel
@@ -1448,7 +1497,7 @@ export default function AdminPortalPage() {
                               : "border-border bg-background text-secondary",
                           )}
                         >
-                          {["A", "B", "C", "D"][idx]}. {opt}
+                          {["A", "B", "C", "D", "E", "F"][idx] ?? idx + 1}. {opt}
                         </div>
                       ))}
                     </div>

@@ -688,7 +688,7 @@ export default function PlayerPage() {
                     {/* 4 Large Touch-Target Options */}
                     <div className="space-y-2 pt-0.5">
                       {view.activeAttempt.question.options.map((opt, idx) => {
-                        const letter = ["A", "B", "C", "D"][idx];
+                        const letter = ["A", "B", "C", "D", "E", "F"][idx] ?? String(idx + 1);
                         const isSelected = selectedOption === idx;
                         return (
                           <button

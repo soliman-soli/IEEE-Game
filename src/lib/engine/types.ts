@@ -1,26 +1,36 @@
 export type Difficulty = "EASY" | "MEDIUM" | "HARD";
 
-export type QuestionCategory =
-  | "HTML"
-  | "CSS"
-  | "JavaScript"
-  | "React"
-  | "Fundamentals"
-  | "APIs"
-  | "Logic";
+export type QuestionCategory = string;
 
 export type RaceStatus = "LOBBY" | "COUNTDOWN" | "RACING" | "FINISHED";
 
 export type AttemptStatus = "ACTIVE" | "CORRECT" | "WRONG" | "ABANDONED";
 
+export interface QuestionSet {
+  id: string;
+  name: string;
+  isBuiltIn: boolean;
+  active: boolean;
+  shuffleOptions: boolean;
+  importedAt: string;
+}
+
+export interface QuestionSetSummary extends QuestionSet {
+  totalCount: number;
+  easyCount: number;
+  mediumCount: number;
+  hardCount: number;
+}
+
 export interface Question {
   id: string;
+  setId?: string;
   difficulty: Difficulty;
   category: QuestionCategory;
   prompt: string;
   codeSnippet?: string | null;
-  options: [string, string, string, string];
-  correctIndex: 0 | 1 | 2 | 3;
+  options: string[];
+  correctIndex: number;
   enabled: boolean;
 }
 
@@ -30,7 +40,7 @@ export interface PublicQuestion {
   category: QuestionCategory;
   prompt: string;
   codeSnippet?: string | null;
-  options: [string, string, string, string];
+  options: string[];
 }
 
 export interface RaceConfig {
@@ -49,8 +59,8 @@ export interface Race extends RaceConfig {
   id: string;
   status: RaceStatus;
   startsAt: string | null; // ISO timestamp
-  endsAt: string | null;   // ISO timestamp
-  createdAt: string;       // ISO timestamp
+  endsAt: string | null; // ISO timestamp
+  createdAt: string; // ISO timestamp
   questionPoolIds: {
     EASY: string[];
     MEDIUM: string[];
@@ -103,6 +113,7 @@ export interface Attempt {
   difficulty: Difficulty;
   status: AttemptStatus;
   selectedIndex: number | null;
+  optionOrder?: number[] | null;
   stepsAwarded: number;
   createdAt: string;
   resolvedAt: string | null;
