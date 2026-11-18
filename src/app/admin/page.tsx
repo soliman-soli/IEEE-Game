@@ -64,12 +64,8 @@ interface AdminPayload {
   players: PublicPlayer[];
   questions: Question[];
   questionSets: QuestionSetSummary[];
-  activePoolSummary: {
-    total: number;
-    EASY: number;
-    MEDIUM: number;
-    HARD: number;
-  };
+  currentSetId: string;
+  currentSetSummary?: QuestionSetSummary;
   enabledCounts: { EASY: number; MEDIUM: number; HARD: number };
   history: ArchivedRound[];
   storageMode: string;
@@ -518,17 +514,24 @@ export default function AdminPortalPage() {
     players,
     questions,
     questionSets = [],
+    currentSetId = "builtin-web-dev",
     enabledCounts,
     history,
   } = data;
-  const activePoolSummary = data.activePoolSummary ?? {
-    total: enabledCounts.EASY + enabledCounts.MEDIUM + enabledCounts.HARD,
-    EASY: enabledCounts.EASY,
-    MEDIUM: enabledCounts.MEDIUM,
-    HARD: enabledCounts.HARD,
-  };
   const isLobby = race.status === "LOBBY";
-  const activeSetsCount = questionSets.filter((s) => s.active).length;
+  const currentSetSummary: QuestionSetSummary =
+    data.currentSetSummary ??
+    questionSets.find((s) => s.id === currentSetId) ?? {
+      id: currentSetId,
+      name: "Web Dev (built-in)",
+      isBuiltIn: true,
+      shuffleOptions: false,
+      importedAt: new Date(0).toISOString(),
+      totalCount: enabledCounts.EASY + enabledCounts.MEDIUM + enabledCounts.HARD,
+      easyCount: enabledCounts.EASY,
+      mediumCount: enabledCounts.MEDIUM,
+      hardCount: enabledCounts.HARD,
+    };
 
   const filteredPlayers = players.filter((p) =>
     playerSearch.trim()
@@ -635,7 +638,7 @@ export default function AdminPortalPage() {
                   id: "sets" as AdminTab,
                   label: "Question Sets",
                   icon: Layers,
-                  badge: `${activeSetsCount}/${questionSets.length || 1}`,
+                  badge: String(questionSets.length || 1),
                 },
                 {
                   id: "questions" as AdminTab,
@@ -872,6 +875,27 @@ export default function AdminPortalPage() {
                       </Button>
                     )}
                   </div>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border bg-elevated/25 px-5 py-3">
+                  <div className="font-mono text-xs text-secondary tabular-nums">
+                    <span>Current questions: </span>
+                    <strong className="text-foreground">
+                      {currentSetSummary.name}
+                    </strong>{" "}
+                    <span>
+                      ({currentSetSummary.totalCount}:{" "}
+                      {currentSetSummary.easyCount} easy /{" "}
+                      {currentSetSummary.mediumCount} medium /{" "}
+                      {currentSetSummary.hardCount} hard)
+                    </span>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="xs"
+                    onClick={() => setActiveTab("sets")}
+                  >
+                    Change question set
+                  </Button>
                 </div>
               </Panel>
 
@@ -1341,8 +1365,9 @@ export default function AdminPortalPage() {
             <QuestionSetsPanel
               race={race}
               questionSets={questionSets}
+              currentSetId={currentSetId}
+              currentSetSummary={currentSetSummary}
               questions={questions}
-              activePoolSummary={activePoolSummary}
               onDashboardUpdated={(payload) => setData(payload as AdminPayload)}
               onSuccessToast={(msg) => {
                 setErrorMsg(null);

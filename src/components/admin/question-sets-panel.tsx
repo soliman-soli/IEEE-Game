@@ -46,13 +46,9 @@ interface PendingImportFile {
 interface QuestionSetsPanelProps {
   race: Race;
   questionSets: QuestionSetSummary[];
+  currentSetId: string;
+  currentSetSummary: QuestionSetSummary;
   questions: Question[];
-  activePoolSummary: {
-    total: number;
-    EASY: number;
-    MEDIUM: number;
-    HARD: number;
-  };
   onDashboardUpdated: (payload: unknown) => void;
   onSuccessToast: (msg: string) => void;
   onErrorToast: (msg: string) => void;
@@ -61,8 +57,9 @@ interface QuestionSetsPanelProps {
 export function QuestionSetsPanel({
   race,
   questionSets,
+  currentSetId,
+  currentSetSummary,
   questions,
-  activePoolSummary,
   onDashboardUpdated,
   onSuccessToast,
   onErrorToast,
@@ -71,10 +68,7 @@ export function QuestionSetsPanel({
   const [isDragging, setIsDragging] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  // Import preview queue (supports 1 or multiple .json files)
   const [pendingImports, setPendingImports] = useState<PendingImportFile[]>([]);
-
-  // Inline rename / delete confirm / preview modal
   const [renamingSetId, setRenamingSetId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -84,37 +78,23 @@ export function QuestionSetsPanel({
   } | null>(null);
 
   const isLiveRace = race.status === "COUNTDOWN" || race.status === "RACING";
-  const activeCount = questionSets.filter((s) => s.active).length;
   const customSetsCount = questionSets.filter((s) => !s.isBuiltIn).length;
 
-  // Low-pool warnings against configured round counts
-  const poolWarnings: string[] = [];
-  if (activePoolSummary.EASY < race.easyCount) {
-    poolWarnings.push(
-      `Easy pool has ${activePoolSummary.EASY} questions, fewer than round target (${race.easyCount}).`,
-    );
-  }
-  if (activePoolSummary.MEDIUM < race.mediumCount) {
-    poolWarnings.push(
-      `Medium pool has ${activePoolSummary.MEDIUM} questions, fewer than round target (${race.mediumCount}).`,
-    );
-  }
-  if (activePoolSummary.HARD < race.hardCount) {
-    poolWarnings.push(
-      `Hard pool has ${activePoolSummary.HARD} questions, fewer than round target (${race.hardCount}).`,
-    );
+  function getSetWarnings(set: QuestionSetSummary): string[] {
+    const warns: string[] = [];
+    if (set.easyCount < race.easyCount) {
+      warns.push(`${set.easyCount} easy (need ${race.easyCount})`);
+    }
+    if (set.mediumCount < race.mediumCount) {
+      warns.push(`${set.mediumCount} medium (need ${race.mediumCount})`);
+    }
+    if (set.hardCount < race.hardCount) {
+      warns.push(`${set.hardCount} hard (need ${race.hardCount})`);
+    }
+    return warns;
   }
 
-  function buildActivePromptSet(): Set<string> {
-    const activeIds = new Set(
-      questionSets.filter((s) => s.active).map((s) => s.id),
-    );
-    return new Set(
-      questions
-        .filter((q) => q.enabled && activeIds.has(q.setId ?? "builtin-web-dev"))
-        .map((q) => normalizeQuestionText(q.prompt)),
-    );
-  }
+  const currentWarnings = getSetWarnings(currentSetSummary);
 
   async function processFiles(files: FileList | File[]) {
     const fileArr = Array.from(files).filter(
@@ -125,7 +105,12 @@ export function QuestionSetsPanel({
       return;
     }
 
-    const activePrompts = buildActivePromptSet();
+    const currentPrompts = new Set(
+      questions
+        .filter((q) => q.setId === currentSetId)
+        .map((q) => normalizeQuestionText(q.prompt)),
+    );
+
     const staged: PendingImportFile[] = [];
 
     for (const file of fileArr) {
@@ -155,7 +140,7 @@ export function QuestionSetsPanel({
       const text = await file.text();
       const validation = validateQuestionSetPayload(text, {
         byteSize: file.size,
-        existingActivePrompts: activePrompts,
+        existingActivePrompts: currentPrompts,
       });
 
       const defaultName =
@@ -169,9 +154,7 @@ export function QuestionSetsPanel({
         rawJson: text,
         setName: defaultName,
         validation,
-        skipDuplicates:
-          validation.duplicateWithinFileCount > 0 ||
-          validation.duplicateAcrossActiveCount > 0,
+        skipDuplicates: validation.duplicateWithinFileCount > 0,
         conflictStrategy: "rename",
       });
     }
@@ -199,6 +182,7 @@ export function QuestionSetsPanel({
           importedCount?: number;
           skippedDuplicateCount?: number;
           appliedToNextRound?: boolean;
+          fellBackToBuiltIn?: boolean;
           set?: QuestionSetSummary;
         };
       };
@@ -220,38 +204,33 @@ export function QuestionSetsPanel({
         conflictStrategy: pending.conflictStrategy,
         skipInvalid: pending.validation.errors.length > 0,
         skipDuplicates: pending.skipDuplicates,
+        makeCurrent: true,
       });
       setPendingImports((prev) => prev.filter((item) => item.id !== pending.id));
       const count = data.result?.importedCount ?? pending.validation.validQuestions.length;
-      const skippedDup = data.result?.skippedDuplicateCount ?? 0;
       const nextNote = data.result?.appliedToNextRound
         ? " (Applies to next round.)"
         : "";
       onSuccessToast(
-        `Imported "${data.result?.set?.name ?? pending.setName}" (${count} questions${
-          skippedDup > 0 ? `, ${skippedDup} duplicates skipped` : ""
-        }).${nextNote}`,
+        `Now using "${data.result?.set?.name ?? pending.setName}" (${count} questions).${nextNote}`,
       );
     } catch (err) {
       onErrorToast(err instanceof Error ? err.message : "Import failed.");
     }
   }
 
-  async function handleToggleActive(set: QuestionSetSummary) {
+  async function handleSelectSet(set: QuestionSetSummary) {
     try {
       const data = await callSetsApi({
-        action: "toggle",
+        action: "select",
         setId: set.id,
-        active: !set.active,
       });
       const nextNote = data.result?.appliedToNextRound
-        ? " Changes apply to the next round."
+        ? " Applies to the next round."
         : "";
-      onSuccessToast(
-        `"${set.name}" is now ${!set.active ? "active" : "inactive"}.${nextNote}`,
-      );
+      onSuccessToast(`Current questions switched to "${set.name}".${nextNote}`);
     } catch (err) {
-      onErrorToast(err instanceof Error ? err.message : "Could not toggle set.");
+      onErrorToast(err instanceof Error ? err.message : "Could not switch set.");
     }
   }
 
@@ -292,10 +271,10 @@ export function QuestionSetsPanel({
         setId,
       });
       setConfirmDeleteId(null);
-      const nextNote = data.result?.appliedToNextRound
-        ? " Changes apply to the next round."
+      const fallbackMsg = data.result?.fellBackToBuiltIn
+        ? " Switched back to Web Dev (built-in)."
         : "";
-      onSuccessToast(`Question set deleted.${nextNote}`);
+      onSuccessToast(`Question set deleted.${fallbackMsg}`);
     } catch (err) {
       onErrorToast(err instanceof Error ? err.message : "Delete failed.");
     }
@@ -336,10 +315,10 @@ export function QuestionSetsPanel({
 
   return (
     <div className="space-y-5">
-      {/* Top Active Pool Summary */}
+      {/* Current Question Source Banner */}
       <Panel
-        index="sets"
-        label="question sets & active pool"
+        index="source"
+        label="current question source"
         rightSlot={
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -378,19 +357,19 @@ export function QuestionSetsPanel({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="font-display text-2xl font-bold tracking-wide text-[#F5F7FA] tabular-nums">
-                Active pool: {activePoolSummary.total} questions (
-                {activePoolSummary.EASY} easy / {activePoolSummary.MEDIUM} medium /{" "}
-                {activePoolSummary.HARD} hard)
+                Current questions: {currentSetSummary.name} (
+                {currentSetSummary.totalCount}: {currentSetSummary.easyCount}{" "}
+                easy / {currentSetSummary.mediumCount} medium /{" "}
+                {currentSetSummary.hardCount} hard)
               </p>
               <p className="mt-0.5 font-mono text-xs text-[#8E9BAE]">
-                {activeCount} of {questionSets.length} sets active · Questions are
-                drawn randomly from all active sets combined.
+                Only this set is used for the round. Sets are never merged.
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Chip tone="success">{activePoolSummary.EASY} easy</Chip>
-              <Chip tone="brand">{activePoolSummary.MEDIUM} medium</Chip>
-              <Chip tone="signal">{activePoolSummary.HARD} hard</Chip>
+              <Chip tone="success">{currentSetSummary.easyCount} easy</Chip>
+              <Chip tone="brand">{currentSetSummary.mediumCount} medium</Chip>
+              <Chip tone="signal">{currentSetSummary.hardCount} hard</Chip>
             </div>
           </div>
 
@@ -398,24 +377,24 @@ export function QuestionSetsPanel({
             <div className="flex items-center gap-2.5 rounded-[var(--radius-default)] border border-[#00D4FF]/40 bg-[#00D4FF]/10 px-3.5 py-2.5 font-mono text-xs text-[#00D4FF]">
               <AlertTriangle className="size-4 shrink-0" />
               <span>
-                Race in progress ({race.status.toLowerCase()}) — current round
-                questions are locked. Any set changes apply to the NEXT round.
+                Race in progress ({race.status.toLowerCase()}) — changing the
+                source applies to the next round.
               </span>
             </div>
           )}
 
-          {poolWarnings.length > 0 && (
-            <div className="space-y-1 rounded-[var(--radius-default)] border border-[#FF453A]/40 bg-[#FF453A]/10 px-3.5 py-2.5 font-mono text-xs text-[#FF453A]">
-              {poolWarnings.map((w) => (
-                <div key={w} className="flex items-center gap-2">
-                  <AlertTriangle className="size-3.5 shrink-0" />
-                  <span>{w}</span>
-                </div>
-              ))}
+          {currentWarnings.length > 0 && (
+            <div className="flex items-center gap-2 rounded-[var(--radius-default)] border border-[#FF453A]/40 bg-[#FF453A]/10 px-3.5 py-2.5 font-mono text-xs text-[#FF453A]">
+              <AlertTriangle className="size-4 shrink-0" />
+              <span>
+                Too small for current round targets ({race.easyCount}/
+                {race.mediumCount}/{race.hardCount}): {currentWarnings.join(", ")}.
+                Start is blocked until fixed or switched.
+              </span>
             </div>
           )}
 
-          {/* Drag-and-Drop Import Zone */}
+          {/* Drag-and-Drop Upload Zone */}
           <div
             role="button"
             tabIndex={0}
@@ -448,10 +427,11 @@ export function QuestionSetsPanel({
           >
             <FileJson className="size-6 text-[#00D4FF]" />
             <p className="mt-2 text-xs font-medium text-[#F5F7FA]">
-              Drag &amp; drop one or multiple <code className="font-mono text-[#00D4FF]">.json</code> files here, or click to browse
+              Drop a <code className="font-mono text-[#00D4FF]">.json</code>{" "}
+              question file here, or click to browse
             </p>
             <p className="mt-1 font-mono text-[11px] text-[#8E9BAE]">
-              Max 2 MB per file · 2–6 options per question · Easy +1 / Medium +2 / Hard +3
+              Creates its own separate set and uses it immediately · Max 2 MB · 2–6 options
             </p>
           </div>
         </div>
@@ -465,14 +445,12 @@ export function QuestionSetsPanel({
             const sameNameExists = questionSets.find(
               (s) => s.name.toLowerCase() === pending.setName.trim().toLowerCase(),
             );
-            const hasDuplicates =
-              v.duplicateWithinFileCount > 0 || v.duplicateAcrossActiveCount > 0;
 
             return (
               <Card key={pending.id} className="border-[#00D4FF]/50">
                 <CardHeader>
                   <div className="flex items-center gap-2">
-                    <Label index="import preview" tone="brand">
+                    <Label index="preview" tone="brand">
                       {pending.fileName}
                     </Label>
                     {v.fatalError ? (
@@ -483,7 +461,7 @@ export function QuestionSetsPanel({
                       </Chip>
                     ) : (
                       <Chip tone="success">
-                        {v.validQuestions.length} valid questions
+                        {v.validQuestions.length} questions ready
                       </Chip>
                     )}
                   </div>
@@ -508,11 +486,10 @@ export function QuestionSetsPanel({
                     </div>
                   ) : (
                     <>
-                      {/* Set Name & Breakdown */}
                       <div className="grid gap-4 sm:grid-cols-2 sm:items-end">
                         <div className="space-y-1.5">
                           <label className="block font-mono text-[11px] lowercase text-[#8E9BAE]">
-                            question set name
+                            set name
                           </label>
                           <Input
                             value={pending.setName}
@@ -536,12 +513,10 @@ export function QuestionSetsPanel({
                         </div>
                       </div>
 
-                      {/* Same-name conflict resolution */}
                       {sameNameExists && (
                         <div className="rounded-[var(--radius-default)] border border-[#F59E0B]/40 bg-[#F59E0B]/10 p-3.5 space-y-2">
                           <p className="font-mono text-xs text-[#F59E0B]">
-                            A set named &quot;{sameNameExists.name}&quot; already
-                            exists. Choose how to proceed:
+                            A set named &quot;{sameNameExists.name}&quot; already exists:
                           </p>
                           <div className="flex flex-wrap gap-2">
                             {!sameNameExists.isBuiltIn && (
@@ -563,7 +538,7 @@ export function QuestionSetsPanel({
                                     : "border-border bg-[#080B10] text-[#8E9BAE]",
                                 )}
                               >
-                                Replace existing
+                                Replace that set
                               </button>
                             )}
                             <button
@@ -584,47 +559,16 @@ export function QuestionSetsPanel({
                                   : "border-border bg-[#080B10] text-[#8E9BAE]",
                               )}
                             >
-                              Keep both (auto-rename)
+                              Keep both as separate sets
                             </button>
                           </div>
                         </div>
                       )}
 
-                      {/* Warnings & Duplicate skip toggle */}
-                      {v.warnings.length > 0 && (
-                        <div className="rounded-[var(--radius-default)] border border-[#F59E0B]/40 bg-[#F59E0B]/10 p-3 space-y-2 font-mono text-xs text-[#F59E0B]">
-                          {v.warnings.map((w, idx) => (
-                            <p key={idx}>• {w}</p>
-                          ))}
-                          {hasDuplicates && (
-                            <label className="flex items-center gap-2 pt-1 text-[#F5F7FA] cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={pending.skipDuplicates}
-                                onChange={(e) => {
-                                  const checked = e.target.checked;
-                                  setPendingImports((prev) =>
-                                    prev.map((item) =>
-                                      item.id === pending.id
-                                        ? { ...item, skipDuplicates: checked }
-                                        : item,
-                                    ),
-                                  );
-                                }}
-                                className="size-4 accent-[#00D4FF]"
-                              />
-                              <span>Skip duplicate questions</span>
-                            </label>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Validation Errors List */}
                       {v.errors.length > 0 && (
                         <div className="max-h-40 overflow-y-auto rounded-[var(--radius-default)] border border-[#FF453A]/40 bg-[#FF453A]/10 p-3 space-y-1 font-mono text-xs text-[#FF453A]">
                           <p className="font-semibold">
-                            Validation issues ({v.errors.length} skipped if you
-                            import valid only):
+                            Validation issues ({v.errors.length} skipped if you continue):
                           </p>
                           {v.errors.map((err, idx) => (
                             <p key={idx}>• {err.message}</p>
@@ -632,10 +576,9 @@ export function QuestionSetsPanel({
                         </div>
                       )}
 
-                      {/* First 3 Valid Questions Preview (Safe plain text, never HTML) */}
                       {v.validQuestions.length > 0 && (
                         <div className="space-y-2">
-                          <Label>first {Math.min(3, v.validQuestions.length)} questions preview</Label>
+                          <Label>first {Math.min(3, v.validQuestions.length)} questions</Label>
                           <div className="space-y-2">
                             {v.validQuestions.slice(0, 3).map((q, idx) => (
                               <div
@@ -655,16 +598,9 @@ export function QuestionSetsPanel({
                                     {q.difficulty.toLowerCase()}
                                   </Chip>
                                   <Chip tone="neutral">{q.category}</Chip>
-                                  {(q.isDuplicateInFile || q.isDuplicateInActiveSets) && (
-                                    <Chip tone="warning">duplicate</Chip>
-                                  )}
                                 </div>
                                 <p className="text-xs font-medium text-[#F5F7FA]">
                                   {q.prompt}
-                                </p>
-                                <p className="font-mono text-[11px] text-[#8E9BAE]">
-                                  Options: {q.options.join(" | ")} (Answer: #
-                                  {q.correctIndex + 1})
                                 </p>
                               </div>
                             ))}
@@ -696,8 +632,8 @@ export function QuestionSetsPanel({
                         <CheckCircle2 className="size-3.5" />
                         <span>
                           {v.errors.length > 0
-                            ? `Import valid only (${v.validQuestions.length})`
-                            : `Save set (${v.validQuestions.length} questions)`}
+                            ? `Use ${v.validQuestions.length} valid questions now`
+                            : "Use these questions now"}
                         </span>
                       </Button>
                     )}
@@ -709,20 +645,21 @@ export function QuestionSetsPanel({
         </div>
       )}
 
-      {/* Question Sets List */}
+      {/* Sets List */}
       <div className="space-y-3">
         {questionSets.map((set) => {
-          const isOnlyActive = set.active && activeCount <= 1;
+          const isCurrent = set.id === currentSetId;
           const dateLabel = set.isBuiltIn
             ? "built-in"
             : new Date(set.importedAt).toISOString().slice(0, 10);
+          const setWarns = getSetWarnings(set);
 
           return (
             <Card
               key={set.id}
               className={cn(
-                "p-4 transition-opacity",
-                set.active ? "border-[#00D4FF]/35" : "opacity-75",
+                "p-4 transition-colors",
+                isCurrent ? "border-[#00D4FF]/60 bg-[#111722]" : "",
               )}
             >
               <div className="flex flex-wrap items-center justify-between gap-4">
@@ -756,10 +693,15 @@ export function QuestionSetsPanel({
                       </h3>
                     )}
 
-                    <Chip tone={set.active ? "success" : "neutral"} dot>
-                      {set.active ? "active" : "inactive"}
-                    </Chip>
-                    {set.isBuiltIn && <Chip tone="brand">built-in</Chip>}
+                    {isCurrent && (
+                      <Chip tone="brand" dot>
+                        Current
+                      </Chip>
+                    )}
+                    {set.isBuiltIn && <Chip tone="neutral">built-in</Chip>}
+                    {setWarns.length > 0 && (
+                      <Chip tone="danger">too small ({setWarns.join(", ")})</Chip>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3 font-mono text-xs text-[#8E9BAE] tabular-nums">
@@ -775,24 +717,17 @@ export function QuestionSetsPanel({
 
                 {/* Per-Set Controls */}
                 <div className="flex flex-wrap items-center gap-2">
-                  {/* Activate / Deactivate Toggle */}
-                  <Button
-                    variant={set.active ? "secondary" : "primary"}
-                    size="xs"
-                    disabled={busy || isOnlyActive}
-                    title={
-                      isOnlyActive
-                        ? "At least one question set must stay active"
-                        : set.active
-                          ? "Deactivate set"
-                          : "Activate set"
-                    }
-                    onClick={() => void handleToggleActive(set)}
-                  >
-                    {set.active ? "Deactivate" : "Activate"}
-                  </Button>
+                  {!isCurrent && (
+                    <Button
+                      variant="primary"
+                      size="xs"
+                      disabled={busy}
+                      onClick={() => void handleSelectSet(set)}
+                    >
+                      Use this set
+                    </Button>
+                  )}
 
-                  {/* Shuffle Options Toggle */}
                   <Button
                     variant="secondary"
                     size="xs"
@@ -818,17 +753,19 @@ export function QuestionSetsPanel({
                     <span>Preview</span>
                   </Button>
 
-                  <Button
-                    variant="secondary"
-                    size="xs"
-                    onClick={() => {
-                      setRenamingSetId(set.id);
-                      setRenameDraft(set.name);
-                    }}
-                  >
-                    <Pencil className="size-3" />
-                    <span>Rename</span>
-                  </Button>
+                  {!set.isBuiltIn && (
+                    <Button
+                      variant="secondary"
+                      size="xs"
+                      onClick={() => {
+                        setRenamingSetId(set.id);
+                        setRenameDraft(set.name);
+                      }}
+                    >
+                      <Pencil className="size-3" />
+                      <span>Rename</span>
+                    </Button>
+                  )}
 
                   <a
                     href={`/api/admin/sets/${encodeURIComponent(set.id)}?download=1`}
@@ -861,7 +798,7 @@ export function QuestionSetsPanel({
                       <Button
                         variant="ghost"
                         size="xs"
-                        disabled={busy || isOnlyActive}
+                        disabled={busy}
                         onClick={() => setConfirmDeleteId(set.id)}
                         className="text-[#FF453A] hover:text-[#FF453A]"
                       >
@@ -876,16 +813,16 @@ export function QuestionSetsPanel({
         })}
       </div>
 
-      {/* Empty State when only built-in set exists (no custom sets imported yet) */}
+      {/* Empty State when only built-in set exists */}
       {customSetsCount === 0 && pendingImports.length === 0 && (
         <Card className="border-dashed p-6 text-center space-y-3">
           <p className="font-sans text-sm font-medium text-[#F5F7FA]">
             No custom question sets imported yet
           </p>
           <p className="mx-auto max-w-md text-xs text-[#8E9BAE]">
-            The 90 built-in Web Dev questions are active above. Download the
-            sample JSON to see the exact import format, or drop your own `.json`
-            file above.
+            Download the sample JSON to see the exact format, or drop your own{" "}
+            <code className="font-mono text-[#00D4FF]">.json</code> file above to
+            switch questions immediately.
           </p>
           <div className="pt-1">
             <Button
@@ -938,24 +875,22 @@ export function QuestionSetsPanel({
                   key={q.id}
                   className="rounded-[var(--radius-default)] border border-border bg-[#080B10] p-3.5 space-y-2"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-[11px] text-[#596579]">
-                        #{idx + 1}
-                      </span>
-                      <Chip
-                        tone={
-                          q.difficulty === "EASY"
-                            ? "success"
-                            : q.difficulty === "HARD"
-                              ? "signal"
-                              : "brand"
-                        }
-                      >
-                        {q.difficulty.toLowerCase()}
-                      </Chip>
-                      <Chip tone="neutral">{q.category}</Chip>
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[11px] text-[#596579]">
+                      #{idx + 1}
+                    </span>
+                    <Chip
+                      tone={
+                        q.difficulty === "EASY"
+                          ? "success"
+                          : q.difficulty === "HARD"
+                            ? "signal"
+                            : "brand"
+                      }
+                    >
+                      {q.difficulty.toLowerCase()}
+                    </Chip>
+                    <Chip tone="neutral">{q.category}</Chip>
                   </div>
                   <p className="text-sm font-medium text-[#F5F7FA]">
                     {q.prompt}

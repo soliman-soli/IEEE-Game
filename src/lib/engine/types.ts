@@ -10,7 +10,6 @@ export interface QuestionSet {
   id: string;
   name: string;
   isBuiltIn: boolean;
-  active: boolean;
   shuffleOptions: boolean;
   importedAt: string;
 }
@@ -61,6 +60,7 @@ export interface Race extends RaceConfig {
   startsAt: string | null; // ISO timestamp
   endsAt: string | null; // ISO timestamp
   createdAt: string; // ISO timestamp
+  currentSetId?: string;
   questionPoolIds: {
     EASY: string[];
     MEDIUM: string[];

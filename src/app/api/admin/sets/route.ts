@@ -11,7 +11,7 @@ import {
   getQuestionSetsOverview,
   importQuestionSet,
   renameQuestionSet,
-  toggleQuestionSetActive,
+  selectCurrentQuestionSet,
   toggleQuestionSetShuffle,
 } from "@/lib/engine/store";
 
@@ -42,9 +42,8 @@ export async function POST(request: Request) {
     }
 
     const body = JSON.parse(rawText) as {
-      action: "import" | "toggle" | "rename" | "shuffle" | "delete";
+      action: "import" | "select" | "rename" | "shuffle" | "delete";
       setId?: string;
-      active?: boolean;
       shuffleOptions?: boolean;
       name?: string;
       rawJson?: string;
@@ -52,6 +51,7 @@ export async function POST(request: Request) {
       conflictStrategy?: "replace" | "rename" | "cancel";
       skipInvalid?: boolean;
       skipDuplicates?: boolean;
+      makeCurrent?: boolean;
     };
 
     let result: Record<string, unknown> = {};
@@ -67,18 +67,15 @@ export async function POST(request: Request) {
         }
 
         const currentDash = await getAdminDashboardData();
-        const activeSetIds = new Set(
-          currentDash.questionSets.filter((s) => s.active).map((s) => s.id),
-        );
-        const existingActivePrompts = new Set(
+        const currentPrompts = new Set(
           currentDash.questions
-            .filter((q) => q.enabled && activeSetIds.has(q.setId ?? "builtin-web-dev"))
+            .filter((q) => q.setId === currentDash.currentSetId)
             .map((q) => normalizeQuestionText(q.prompt)),
         );
 
         const validation = validateQuestionSetPayload(
           body.rawJson !== undefined ? body.rawJson : body.questions,
-          { existingActivePrompts },
+          { existingActivePrompts: currentPrompts },
         );
 
         if (validation.fatalError) {
@@ -110,15 +107,16 @@ export async function POST(request: Request) {
           questions: validation.validQuestions,
           conflictStrategy: body.conflictStrategy ?? "rename",
           skipDuplicates: Boolean(body.skipDuplicates),
+          makeCurrent: body.makeCurrent ?? true,
         });
         break;
       }
 
-      case "toggle":
-        if (!body.setId || typeof body.active !== "boolean") {
-          throw new Error("Missing setId or active state.");
+      case "select":
+        if (!body.setId) {
+          throw new Error("Missing setId.");
         }
-        result = await toggleQuestionSetActive(body.setId, body.active);
+        result = await selectCurrentQuestionSet(body.setId);
         break;
 
       case "rename":

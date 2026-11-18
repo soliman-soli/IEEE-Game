@@ -10,17 +10,63 @@ import {
   getAdminDashboardData,
   getQuestionSetDetail,
   importQuestionSet,
+  joinRace,
+  pickDifficulty,
   renameQuestionSet,
-  toggleQuestionSetActive,
+  selectCurrentQuestionSet,
+  startRace,
+  submitAnswer,
   toggleQuestionSetShuffle,
 } from "@/lib/engine/store";
 
 const DATA_FILE = path.join(process.cwd(), ".data", "game-store.json");
 let previousDataFileContent: string | null = null;
 
-describe("Question Sets Store Integration", () => {
+function buildGeneralKnowledgeFixtureJson(): string {
+  const items: Array<{
+    id: string;
+    difficulty: "easy" | "medium" | "hard";
+    points: number;
+    category: string;
+    question: string;
+    options: string[];
+    answerIndex: number;
+  }> = [];
+
+  for (let i = 1; i <= 10; i++) {
+    items.push({
+      id: `gk-e-${i}`,
+      difficulty: "easy",
+      points: 1,
+      category: "General Knowledge",
+      question: `GK Easy Question #${i}?`,
+      options: ["Alpha", "Beta", "Gamma", "Delta"],
+      answerIndex: 0,
+    });
+    items.push({
+      id: `gk-m-${i}`,
+      difficulty: "medium",
+      points: 2,
+      category: "General Knowledge",
+      question: `GK Medium Question #${i}?`,
+      options: ["One", "Two", "Three", "Four"],
+      answerIndex: 1,
+    });
+    items.push({
+      id: `gk-h-${i}`,
+      difficulty: "hard",
+      points: 3,
+      category: "General Knowledge",
+      question: `GK Hard Question #${i}?`,
+      options: ["Red", "Green", "Blue", "Yellow"],
+      answerIndex: 2,
+    });
+  }
+  return JSON.stringify(items);
+}
+
+describe("Single-Source Question Sets & Import Regression", () => {
   beforeAll(() => {
-    // Force pure local-store mode for isolated integration testing
     delete process.env.NEXT_PUBLIC_SUPABASE_URL;
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;
     delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -47,131 +93,102 @@ describe("Question Sets Store Integration", () => {
     }
   });
 
-  it("attaches the 90 built-in questions as 'Web Dev (built-in)' and blocks deleting it", async () => {
-    const dash = await getAdminDashboardData();
-    const builtIn = dash.questionSets.find((s) => s.id === BUILT_IN_SET_ID);
-    expect(builtIn).toBeDefined();
-    expect(builtIn?.name).toBe(BUILT_IN_SET_NAME);
-    expect(builtIn?.isBuiltIn).toBe(true);
-    expect(builtIn?.active).toBe(true);
-    expect(builtIn?.totalCount).toBe(90);
-    expect(dash.activePoolSummary).toEqual({
-      total: 90,
-      EASY: 30,
-      MEDIUM: 30,
-      HARD: 30,
-    });
+  it("keeps 'Web Dev (built-in)' read-only at 90 (30/30/30) and never merges imports into it", async () => {
+    const before = await getAdminDashboardData();
+    const builtInBefore = before.questionSets.find((s) => s.id === BUILT_IN_SET_ID);
+    expect(builtInBefore?.name).toBe(BUILT_IN_SET_NAME);
+    expect(builtInBefore?.totalCount).toBe(90);
+    expect(before.currentSetId).toBe(BUILT_IN_SET_ID);
 
-    await expect(deleteQuestionSet(BUILT_IN_SET_ID)).rejects.toThrow(
-      /cannot be deleted/i,
+    await expect(deleteQuestionSet(BUILT_IN_SET_ID)).rejects.toThrow(/cannot be deleted/i);
+    await expect(renameQuestionSet(BUILT_IN_SET_ID, "Other")).rejects.toThrow(
+      /cannot be renamed/i,
     );
-    await expect(toggleQuestionSetActive(BUILT_IN_SET_ID, false)).rejects.toThrow(
-      /At least one question set must stay active/i,
-    );
-  });
 
-  it("imports a valid set, mixes two active sets, and allows deactivating the built-in set", async () => {
-    const validJson = JSON.stringify({
-      name: "General Knowledge",
-      questions: [
-        {
-          difficulty: "easy",
-          category: "Science",
-          question: "Water chemical formula?",
-          options: ["H2O", "O2"],
-          answerIndex: 0,
-        },
-        {
-          difficulty: "medium",
-          category: "History",
-          question: "Year Apollo 11 landed?",
-          options: ["1965", "1969", "1972", "1975"],
-          answerIndex: 1,
-        },
-        {
-          difficulty: "hard",
-          category: "Physics",
-          question: "Speed of light approx in km/s?",
-          options: ["100,000", "200,000", "300,000", "400,000", "500,000"],
-          answerIndex: 2,
-        },
-      ],
-    });
-
-    const parsed = validateQuestionSetPayload(validJson);
-    expect(parsed.fatalError).toBeNull();
-    expect(parsed.validQuestions).toHaveLength(3);
+    // Regression: import 30-question array (10 easy, 10 medium, 10 hard)
+    const gkRaw = buildGeneralKnowledgeFixtureJson();
+    const validation = validateQuestionSetPayload(gkRaw);
+    expect(validation.fatalError).toBeNull();
+    expect(validation.errors).toHaveLength(0);
+    expect(validation.breakdown).toEqual({ EASY: 10, MEDIUM: 10, HARD: 10 });
 
     const imp = await importQuestionSet({
-      name: parsed.detectedName!,
-      questions: parsed.validQuestions,
-    });
-    expect(imp.importedCount).toBe(3);
-
-    // Two sets active at once: 90 + 3 = 93
-    const dashBoth = await getAdminDashboardData();
-    expect(dashBoth.activePoolSummary).toEqual({
-      total: 93,
-      EASY: 31,
-      MEDIUM: 31,
-      HARD: 31,
+      name: "general-knowledge-questions",
+      questions: validation.validQuestions,
+      makeCurrent: true,
     });
 
-    // Deactivate built-in set -> only General Knowledge (3) remains active
-    await toggleQuestionSetActive(BUILT_IN_SET_ID, false);
-    const dashCustomOnly = await getAdminDashboardData();
-    expect(dashCustomOnly.activePoolSummary).toEqual({
-      total: 3,
-      EASY: 1,
-      MEDIUM: 1,
-      HARD: 1,
-    });
+    expect(imp.importedCount).toBe(30);
+    expect(imp.set.totalCount).toBe(30);
+    expect(imp.set.easyCount).toBe(10);
+    expect(imp.set.mediumCount).toBe(10);
+    expect(imp.set.hardCount).toBe(10);
 
-    // Blocking deactivating the last remaining active set
-    await expect(toggleQuestionSetActive(imp.set.id, false)).rejects.toThrow(
-      /At least one question set must stay active/i,
-    );
+    // Web Dev (built-in) MUST remain untouched at 90 (30/30/30)
+    const after = await getAdminDashboardData();
+    expect(after.currentSetId).toBe(imp.set.id);
+    const builtInAfter = after.questionSets.find((s) => s.id === BUILT_IN_SET_ID);
+    expect(builtInAfter?.totalCount).toBe(90);
+    expect(builtInAfter?.easyCount).toBe(30);
+    expect(builtInAfter?.mediumCount).toBe(30);
+    expect(builtInAfter?.hardCount).toBe(30);
 
-    // Re-activate built-in set and test rename + shuffle + delete
-    await toggleQuestionSetActive(BUILT_IN_SET_ID, true);
-    await renameQuestionSet(imp.set.id, "GK Renamed");
+    // Start a round from General Knowledge only and verify player receives GK questions
+    const { playerToken } = await joinRace("GK_Tester");
+    const startedRace = await startRace();
+    // Force start timestamp to past so race is active immediately
+    const g = globalThis as unknown as {
+      __ieeeGameStore: { races: Array<{ id: string; status: string; startsAt: string }> };
+    };
+    const activeR = g.__ieeeGameStore.races.find((r) => r.id === startedRace.id)!;
+    activeR.status = "RACING";
+    activeR.startsAt = new Date(Date.now() - 2000).toISOString();
+
+    const picked = await pickDifficulty(playerToken, "EASY");
+    expect(picked.activeAttempt?.question.category).toBe("General Knowledge");
+    expect(picked.activeAttempt?.question.prompt).toContain("GK Easy Question");
+
+    const ans = await submitAnswer(playerToken, picked.activeAttempt!.attemptId, 0);
+    expect(ans.outcome).toBe("CORRECT");
+    expect(ans.stepsEarned).toBe(1);
+
+    // Create new round, switch back to Web Dev (built-in), verify Web Dev plays normally
+    await createNewRound("Web Dev Round");
+    await selectCurrentQuestionSet(BUILT_IN_SET_ID);
+    const dashWebDev = await getAdminDashboardData();
+    expect(dashWebDev.currentSetId).toBe(BUILT_IN_SET_ID);
+    expect(dashWebDev.currentSetSummary?.totalCount).toBe(90);
+
+    // Delete imported set while it is selected -> falls back cleanly to Web Dev (built-in)
+    await selectCurrentQuestionSet(imp.set.id);
     await toggleQuestionSetShuffle(imp.set.id, true);
     const detail = await getQuestionSetDetail(imp.set.id);
-    expect(detail.set.name).toBe("GK Renamed");
     expect(detail.set.shuffleOptions).toBe(true);
-    expect(detail.questions).toHaveLength(3);
 
-    // Duplicate name handling: cancel vs rename vs replace
-    await expect(
-      importQuestionSet({
-        name: "GK Renamed",
-        questions: parsed.validQuestions,
-        conflictStrategy: "cancel",
-      }),
-    ).rejects.toThrow(/already exists/i);
+    const delRes = await deleteQuestionSet(imp.set.id);
+    expect(delRes.fellBackToBuiltIn).toBe(true);
+    const afterDelete = await getAdminDashboardData();
+    expect(afterDelete.currentSetId).toBe(BUILT_IN_SET_ID);
+  });
 
-    const renamedImp = await importQuestionSet({
-      name: "GK Renamed",
-      questions: parsed.validQuestions,
-      conflictStrategy: "rename",
+  it("blocks Start race when the current set has fewer questions than the round target", async () => {
+    const tiny = validateQuestionSetPayload(
+      JSON.stringify([
+        {
+          difficulty: "easy",
+          question: "Only 1 easy?",
+          options: ["A", "B"],
+          answerIndex: 0,
+        },
+      ]),
+    );
+    const imp = await importQuestionSet({
+      name: "Tiny Set",
+      questions: tiny.validQuestions,
+      makeCurrent: true,
     });
-    expect(renamedImp.set.name).toBe("GK Renamed (2)");
 
-    const replacedImp = await importQuestionSet({
-      name: "GK Renamed",
-      questions: [parsed.validQuestions[0]],
-      conflictStrategy: "replace",
-    });
-    expect(replacedImp.importedCount).toBe(1);
-
-    // Clean up custom sets
-    await deleteQuestionSet(replacedImp.set.id);
-    await deleteQuestionSet(renamedImp.set.id);
-
-    // Confirm new round builds pool from active Web Dev set cleanly
-    const nextRace = await createNewRound("Verify Round");
-    expect(nextRace.questionPoolIds.EASY.length).toBe(10);
-    expect(nextRace.questionPoolIds.MEDIUM.length).toBe(10);
-    expect(nextRace.questionPoolIds.HARD.length).toBe(10);
+    await expect(startRace()).rejects.toThrow(/Cannot start race/i);
+    await deleteQuestionSet(imp.set.id);
   });
 });

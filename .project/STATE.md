@@ -1,6 +1,6 @@
 # State
 
-**Phase:** Phase 4 (Implementation), Phase 5 (55-Bot Simulation & Unit Tests), Phase 6 (Organizer Run-Sheet & Event Readiness), F1 Broadcast UI Overhaul (D-031), and Question Sets Feature (D-032) complete.
+**Phase:** Phase 4 (Implementation), Phase 5 (55-Bot Simulation & Unit Tests), Phase 6 (Organizer Run-Sheet & Event Readiness), F1 Broadcast UI Overhaul (D-031), and Simplified Single-Source Question Sets (D-033) complete.
 **Status:** Ready for production deployment on Vercel (`https://ieee-game-one.vercel.app`).
 
 ## Verified
